@@ -60,27 +60,43 @@ function usage(exitCode = 0) {
 
 Usage:
   jooja-auth-hub-client health [--base-url <url>]
-  jooja-auth-hub-client google connect-url --principal <kind:id> [--scopes "scope1 scope2"]
-  jooja-auth-hub-client google status --principal <kind:id>
+
+  # Google connect
+  jooja-auth-hub-client google connect-url --principal-id <uuid> [--scopes "scope1 scope2"]
+  jooja-auth-hub-client google status --principal-id <uuid>
+
+  # Token retrieval (preferred: per-principal clientSecret)
+  jooja-auth-hub-client token get --providerId <provider> [--principal-id <uuid>] [--client-secret <secret>] [--min-ttl-sec 120] [--force-refresh]
+
+  # Admin
   jooja-auth-hub-client admin stats [--admin-api-key <key>]
-  jooja-auth-hub-client admin tokens [--providerId google] [--principalId telegram:...] [--admin-api-key <key>]
-  jooja-auth-hub-client token get --principalId <kind:id> --providerId <provider> [--min-ttl-sec 120] [--force-refresh]
+  jooja-auth-hub-client admin tokens [--providerId google] [--principalId <uuid>] [--admin-api-key <key>]
+  jooja-auth-hub-client admin principals [--admin-api-key <key>]
+  jooja-auth-hub-client admin principal create [--display-name "Ilia"] [--legacy-principal-ref "telegram:540443"] [--admin-api-key <key>]
 
 Env vars:
   AUTH_HUB_BASE_URL         (default http://127.0.0.1:8787)
   AUTH_HUB_ADMIN_API_KEY    (optional; for /v1/admin/*)
-  AUTH_HUB_PRINCIPAL        (optional; used when --principal is omitted)
-  AUTH_HUB_BEARER_TOKEN     (required for /v1/tokens/* endpoints)
+
+  # v2 identity (preferred)
+  AUTH_HUB_PRINCIPAL_ID     (uuid)
+  AUTH_HUB_CLIENT_SECRET    (secret)
+
+  # legacy shared bearer token mode (optional)
+  AUTH_HUB_BEARER_TOKEN
 
 Examples:
   # Health
   jooja-auth-hub-client health
 
-  # Get a connect URL (JSON mode behind the scenes)
-  jooja-auth-hub-client google connect-url --principal telegram:540443
+  # Create a new principal (admin)
+  jooja-auth-hub-client admin principal create --display-name "Ilia" --legacy-principal-ref "telegram:540443"
 
-  # Check whether the principal has a Google token stored
-  jooja-auth-hub-client google status --principal telegram:540443
+  # Get a connect URL
+  jooja-auth-hub-client google connect-url --principal-id <uuid>
+
+  # Get a Google access token
+  jooja-auth-hub-client token get --providerId google --principal-id <uuid> --client-secret <secret>
 `;
 
   // eslint-disable-next-line no-console
@@ -97,9 +113,14 @@ async function main() {
     ''
   );
   const adminApiKey = getFlag(flags, 'admin-api-key') ?? process.env.AUTH_HUB_ADMIN_API_KEY;
+
+  const principalId = getFlag(flags, 'principal-id') ?? process.env.AUTH_HUB_PRINCIPAL_ID;
+  const clientSecret = getFlag(flags, 'client-secret') ?? process.env.AUTH_HUB_CLIENT_SECRET;
+
+  // legacy
   const bearerToken = getFlag(flags, 'bearer-token') ?? process.env.AUTH_HUB_BEARER_TOKEN;
 
-  const client = new AuthHubClient({ baseUrl, adminApiKey, bearerToken });
+  const client = new AuthHubClient({ baseUrl, adminApiKey, principalId, clientSecret, bearerToken });
 
   const [cmd1, cmd2, cmd3] = positionals;
 
@@ -111,21 +132,21 @@ async function main() {
   }
 
   if (cmd1 === 'google' && cmd2 === 'connect-url') {
-    const principal = getFlag(flags, 'principal') ?? process.env.AUTH_HUB_PRINCIPAL;
-    if (!principal) throw new Error('Missing --principal (or AUTH_HUB_PRINCIPAL)');
+    const pid = principalId ?? getFlag(flags, 'principal-id');
+    if (!pid) throw new Error('Missing --principal-id (or AUTH_HUB_PRINCIPAL_ID)');
 
     const scopes = getFlag(flags, 'scopes');
-    const url = await client.googleConnectUrl({ principal, scopes });
+    const url = await client.googleConnectUrl({ principalId: pid, scopes });
     // eslint-disable-next-line no-console
     console.log(url);
     return;
   }
 
   if (cmd1 === 'google' && cmd2 === 'status') {
-    const principal = getFlag(flags, 'principal') ?? process.env.AUTH_HUB_PRINCIPAL;
-    if (!principal) throw new Error('Missing --principal (or AUTH_HUB_PRINCIPAL)');
+    const pid = principalId ?? getFlag(flags, 'principal-id');
+    if (!pid) throw new Error('Missing --principal-id (or AUTH_HUB_PRINCIPAL_ID)');
 
-    const res = await client.googleStatus({ principal });
+    const res = await client.googleStatus({ principalId: pid });
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(res, null, 2));
     return;
@@ -140,31 +161,44 @@ async function main() {
 
   if (cmd1 === 'admin' && cmd2 === 'tokens') {
     const providerId = getFlag(flags, 'providerId');
-    const principalId = getFlag(flags, 'principalId');
-    const res = await client.adminTokens({ providerId, principalId });
+    const p = getFlag(flags, 'principalId');
+    const res = await client.adminTokens({ providerId, principalId: p });
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd1 === 'admin' && cmd2 === 'principals') {
+    const res = await client.adminPrincipals();
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd1 === 'admin' && cmd2 === 'principal' && cmd3 === 'create') {
+    const displayName = getFlag(flags, 'display-name');
+    const legacyPrincipalRef = getFlag(flags, 'legacy-principal-ref');
+
+    const res = await client.adminCreatePrincipal({ displayName, legacyPrincipalRef });
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(res, null, 2));
     return;
   }
 
   if (cmd1 === 'token' && cmd2 === 'get') {
-    const principalId = getFlag(flags, 'principalId');
     const providerId = getFlag(flags, 'providerId');
-    if (!principalId) throw new Error('Missing --principalId');
     if (!providerId) throw new Error('Missing --providerId');
+
+    const pid = principalId ?? getFlag(flags, 'principal-id');
+    const secret = clientSecret ?? getFlag(flags, 'client-secret');
+    if (!pid) throw new Error('Missing --principal-id (or AUTH_HUB_PRINCIPAL_ID)');
+    if (!secret) throw new Error('Missing --client-secret (or AUTH_HUB_CLIENT_SECRET)');
 
     const minTtlSecRaw = getFlag(flags, 'min-ttl-sec');
     const minTtlSec = minTtlSecRaw ? Number(minTtlSecRaw) : undefined;
     const forceRefresh = hasFlag(flags, 'force-refresh');
 
-    const res = await client.tokenAccess({ principalId, providerId, minTtlSec, forceRefresh });
-    if (res === null) {
-      // eslint-disable-next-line no-console
-      console.error('Token retrieval endpoint is not enabled on the hub (got 404). Is TOKEN_BEARER_TOKEN set on the hub?');
-      process.exitCode = 2;
-      return;
-    }
-
+    const res = await client.tokenAccess({ principalId: pid, clientSecret: secret, providerId, minTtlSec, forceRefresh });
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(res, null, 2));
     return;

@@ -29,7 +29,7 @@ It exists mainly so other agents/tools have a single reference implementation fo
 ## Operational expectations
 
 - Keep dependencies minimal.
-- Maintain backwards compatibility with the hub v0 contract.
+- Maintain backwards compatibility with the hub v0/v1 legacy contract where feasible, but treat v2 (UUID principal + clientSecret) as the default.
 - When hub endpoints change, update:
   - `docs/contract.md`
   - `README.md`
@@ -49,5 +49,7 @@ node dist/cli.js health
 ## Notes
 
 - Token retrieval is implemented as an MVP now.
-- It is intentionally **limited** (single shared bearer token, no per-principal ACL yet).
+- It is intentionally **limited** (access tokens only; refresh tokens never leave the hub).
+- Preferred auth is per-principal `clientSecret` (HTTP Basic).
+- Legacy shared bearer-token mode may still exist for transition.
 - This client must keep the contract honest: do not add features that widen access or dump secrets.

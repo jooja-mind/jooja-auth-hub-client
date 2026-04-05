@@ -1,4 +1,4 @@
-# Auth Hub Client Contract (v0)
+# Auth Hub Client Contract (v2)
 
 This document is written for **other internal scripts/agents**.
 
@@ -9,23 +9,30 @@ This document is written for **other internal scripts/agents**.
 - Local dev (default): `http://127.0.0.1:8787`
 - Current public deployment (as of April 2026): `https://jooja-auth.leverton.dev`
 
-## Principal format
+## Identity model
 
-A principal identifies *who the token belongs to*.
+### Principal
 
-Current MVP format is a string:
+A **principal** is *who the tokens belong to*.
+
+In v2, principals are server-issued and opaque:
+
+- `principalId` — UUID (public identifier)
+- `clientSecret` — secret (used to authenticate token retrieval)
+
+The hub stores secret verification material; the secret is only returned once at issuance/rotation time.
+
+### Auth: Basic
+
+For per-principal token retrieval, clients authenticate with HTTP Basic:
 
 ```
-<kind>:<id>
+Authorization: Basic base64(<principalId>:<clientSecret>)
 ```
-
-Examples:
-- `telegram:540443` (Telegram user)
-- `telegram-chat:-1001234567890` (Telegram group/channel)
 
 Notes:
-- The hub normalizes this value server-side.
-- Treat principal IDs as semi-sensitive metadata (don’t spray them into logs).
+- treat `clientSecret` like a password.
+- do not log Basic headers.
 
 ## Health
 
@@ -39,10 +46,10 @@ Response:
 
 ## Google provider
 
-### Start OAuth: `GET /auth/google/start`
+### Start OAuth (connect URL): `GET /v1/providers/google/auth/start`
 
 Query:
-- `principal` (required)
+- `principalId` (required, UUID)
 - `scopes` (optional) — space or comma separated
 
 Behavior:
@@ -62,13 +69,13 @@ This is a browser endpoint. On success the hub stores the token envelope.
 ### Status: `GET /v1/providers/google/status`
 
 Query:
-- `principal` (required)
+- `principalId` (required, UUID)
 
 Response:
 
 ```json
 {
-  "principalId": "telegram:540443",
+  "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
   "providerId": "google",
   "hasToken": true,
   "updatedAt": "2026-04-05T12:34:56.000Z"
@@ -76,8 +83,6 @@ Response:
 ```
 
 ## Admin endpoints (optional)
-
-These endpoints exist for debugging/ops and never return token contents.
 
 If the hub is configured with `ADMIN_API_KEY`, calls must include:
 
@@ -110,32 +115,67 @@ Response:
 [
   {
     "providerId": "google",
-    "principalId": "telegram:540443",
+    "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
     "createdAt": "...",
     "updatedAt": "..."
   }
 ]
 ```
 
-## Token retrieval (MVP)
+### `POST /v1/admin/principals`
+
+Creates a principal. Returns the `clientSecret` **only once**.
+
+Body (all optional):
+
+```json
+{
+  "displayName": "Ilia",
+  "legacyPrincipalRef": "telegram:540443"
+}
+```
+
+Response (201):
+
+```json
+{
+  "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
+  "clientSecret": "...",
+  "createdAt": "...",
+  "displayName": "Ilia",
+  "legacyPrincipalRef": "telegram:540443"
+}
+```
+
+### Migration helper: `POST /v1/admin/migrate/tokens`
+
+Moves tokens from an old principal key (e.g. `telegram:540443`) to a UUID principal.
+
+Body:
+
+```json
+{
+  "fromPrincipalId": "telegram:540443",
+  "toPrincipalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a"
+}
+```
+
+## Token retrieval (v2)
 
 These endpoints return a **short-lived access token** (never the refresh token).
 
-Auth:
-- hub must be configured with `TOKEN_BEARER_TOKEN`
-- callers must send:
-
-```
-Authorization: Bearer <TOKEN_BEARER_TOKEN>
-```
-
 ### `POST /v1/tokens/access`
+
+Auth:
+
+```
+Authorization: Basic base64(<principalId>:<clientSecret>)
+```
 
 Request body:
 
 ```json
 {
-  "principalId": "telegram:540443",
   "providerId": "google",
   "minTtlSec": 120,
   "forceRefresh": false
@@ -148,7 +188,7 @@ Response:
 {
   "ok": true,
   "providerId": "google",
-  "principalId": "telegram:540443",
+  "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
   "tokenType": "Bearer",
   "scope": "...",
   "accessToken": "ya29...",
@@ -161,11 +201,15 @@ Response:
 Notes:
 - Currently only `providerId=google` is supported.
 - If the stored token has no `refresh_token`, the hub responds with `409 reauth_required`.
-- If `TOKEN_BEARER_TOKEN` is not set on the hub, these routes are **not registered** and you will get `404`.
 
-### Legacy/debug GET aliases
+## Legacy bearer-mode token retrieval (optional)
 
-- `GET /v1/tokens/access?principalId=...&providerId=...`
-- `GET /v1/tokens/get?principalId=...&providerId=...`
+The hub may still accept:
 
-These behave like the POST endpoint but may leak metadata via query-string logging.
+```
+Authorization: Bearer <TOKEN_BEARER_TOKEN>
+```
+
+…if `TOKEN_BEARER_TOKEN` is configured on the hub.
+
+This exists for transition only; prefer v2 Basic auth.
