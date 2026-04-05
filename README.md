@@ -85,6 +85,8 @@ Checks whether the JQA server is reachable.
 jqa connect-url
 ```
 
+This uses your configured `JQA_UUID`, not a Telegram id or any guessable principal string.
+
 Use this when a human needs to connect a provider account for the first time.
 
 ### Check provider status
