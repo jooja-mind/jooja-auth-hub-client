@@ -52,8 +52,11 @@ Provider routes are namespaced by provider id.
 
 ### Start OAuth (connect URL): `GET /v1/providers/:providerId/auth/start`
 
+Auth (preferred / production):
+- `Authorization: Basic base64(<principalId>:<clientSecret>)`
+
 Query:
-- `principalId` (required, UUID)
+- `principalId` (UUID, kept for backwards compatibility; server may ignore it when Basic auth is used)
 - `scopes` (optional) — space or comma separated
 
 Behavior:
@@ -72,8 +75,11 @@ This is a browser endpoint. On success JQA stores the token envelope.
 
 ### Status: `GET /v1/providers/:providerId/status`
 
+Auth (preferred / production):
+- `Authorization: Basic base64(<principalId>:<clientSecret>)`
+
 Query:
-- `principalId` (required, UUID)
+- `principalId` (UUID, kept for backwards compatibility)
 
 Response:
 
@@ -127,12 +133,21 @@ Response:
 Notes:
 - If the stored token has no `refresh_token`, the service may respond with `409 reauth_required`.
 
-## Admin endpoints (optional)
+## Admin endpoints
 
-If configured with `ADMIN_API_KEY`, calls must include:
+Admin endpoints are always protected.
+
+If the server is not configured with an admin API key, it responds with:
+- `503 { "error": "admin_not_configured" }`
+
+Server config env vars:
+- `JQA_ADMIN_API_KEY` (preferred)
+- `ADMIN_API_KEY` (legacy alias)
+
+Calls must include:
 
 ```
-x-api-key: <ADMIN_API_KEY>
+x-api-key: <admin api key>
 ```
 
 ### `GET /v1/admin/stats`

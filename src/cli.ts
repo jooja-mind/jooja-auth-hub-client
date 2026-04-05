@@ -90,8 +90,8 @@ function usage(exitCode = 0) {
 
 Usage:
   jqa token [--provider <id>] [--uuid <uuid>] [--secret <secret>] [--min-ttl-sec 120] [--force-refresh] [--json]
-  jqa connect-url [--provider <id>] [--uuid <uuid>] [--scopes "scope1 scope2"]
-  jqa status [--provider <id>] [--uuid <uuid>]
+  jqa connect-url [--provider <id>] [--uuid <uuid>] [--secret <secret>] [--scopes "scope1 scope2"]
+  jqa status [--provider <id>] [--uuid <uuid>] [--secret <secret>]
   jqa health
 
   # Admin (issues a new UUID+secret)
@@ -156,9 +156,10 @@ async function main() {
   if (cmd1 === 'connect-url') {
     if (!providerId) die('Missing provider id (set JQA_PROVIDER or pass --provider)');
     if (!uuid) die('Missing uuid (set JQA_UUID or pass --uuid)');
+    if (!secret) die('Missing secret (set JQA_SECRET or pass --secret)');
 
     const scopes = getFlag(flags, 'scopes');
-    const url = await client.connectUrl({ providerId, uuid, scopes });
+    const url = await client.connectUrl({ providerId, uuid, secret, scopes });
     // eslint-disable-next-line no-console
     console.log(url);
     return;
@@ -167,8 +168,9 @@ async function main() {
   if (cmd1 === 'status') {
     if (!providerId) die('Missing provider id (set JQA_PROVIDER or pass --provider)');
     if (!uuid) die('Missing uuid (set JQA_UUID or pass --uuid)');
+    if (!secret) die('Missing secret (set JQA_SECRET or pass --secret)');
 
-    const res = await client.status({ providerId, uuid });
+    const res = await client.status({ providerId, uuid, secret });
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(res, null, 2));
     return;

@@ -51,6 +51,7 @@ Once you have `JQA_UUID` and `JQA_PROVIDER`, generate the connect URL:
 
 ```bash
 export JQA_UUID="..."
+export JQA_SECRET="..."
 export JQA_PROVIDER="google"
 
 jqa connect-url

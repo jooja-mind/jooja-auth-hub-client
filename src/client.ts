@@ -149,15 +149,20 @@ export class JqaClient {
    * JQA redirects by default, but when `Accept: application/json` is set,
    * it returns `{ url }` instead.
    */
-  async connectUrl(opts: { providerId: string; uuid?: string; scopes?: string }): Promise<string> {
+  async connectUrl(opts: { providerId: string; uuid?: string; secret?: string; scopes?: string }): Promise<string> {
     const principalId = opts.uuid ?? this.uuid;
+    const clientSecret = opts.secret ?? this.secret;
+
     if (!principalId) throw new Error('Missing uuid (JQA_UUID)');
+    if (!clientSecret) throw new Error('Missing secret (JQA_SECRET)');
 
     const res = await this.fetchJson<{ url: string }>(
       'GET',
       `/v1/providers/${encodeURIComponent(opts.providerId)}/auth/start`,
       {
-        query: { principalId, scopes: opts.scopes }
+        // Keep query principalId for backwards compatibility with older servers.
+        query: { principalId, scopes: opts.scopes },
+        headers: { authorization: basicAuthHeader(principalId, clientSecret) }
       }
     );
 
@@ -170,15 +175,19 @@ export class JqaClient {
     throw new Error(`Failed to build connect url: HTTP ${res.status} ${res.text}`);
   }
 
-  async status(opts: { providerId: string; uuid?: string }): Promise<ProviderStatusResponse> {
+  async status(opts: { providerId: string; uuid?: string; secret?: string }): Promise<ProviderStatusResponse> {
     const principalId = opts.uuid ?? this.uuid;
+    const clientSecret = opts.secret ?? this.secret;
+
     if (!principalId) throw new Error('Missing uuid (JQA_UUID)');
+    if (!clientSecret) throw new Error('Missing secret (JQA_SECRET)');
 
     const res = await this.fetchJson<ProviderStatusResponse>(
       'GET',
       `/v1/providers/${encodeURIComponent(opts.providerId)}/status`,
       {
-        query: { principalId }
+        query: { principalId },
+        headers: { authorization: basicAuthHeader(principalId, clientSecret) }
       }
     );
 
