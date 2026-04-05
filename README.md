@@ -20,6 +20,11 @@ You do **not** need to set the base URL unless you want to override it.
 
 ---
 
+## Example project
+
+If you want to see the smallest practical example using this client with Google Drive, see:
+- https://github.com/jooja-mind/google-drive
+
 ## 1. What this is
 
 This package solves one annoying problem:
