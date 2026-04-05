@@ -81,7 +81,7 @@ That response includes both:
 
 For LinkedIn, OAuth success only means the access token was stored. Posting or other advanced APIs can still require separate LinkedIn product approval.
 
-For Google, a server may request sensitive/restricted scopes such as Gmail or Meet depending on how its connect preset is configured.
+For Google, a server may request sensitive/restricted scopes such as Gmail, Meet, Presentations, or YouTube-related scopes depending on how its connect preset is configured.
 
 ## 3) Store credentials locally (outside git)
 

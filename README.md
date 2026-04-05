@@ -8,7 +8,7 @@ Its job is simple:
 - give that token to your script, tool, or AI agent
 
 Providers:
-- `google` (OAuth; JQA full preset currently includes Drive, Sheets, Calendar, Gmail, Tasks, and Meet-related scopes)
+- `google` (OAuth; JQA full preset currently includes Drive, Sheets, Calendar, Presentations, Gmail, Tasks, Meet-related scopes, and YouTube read/analytics scopes)
 - `applemusic` (MusicKit JS connect flow; token response includes an extra `musicUserToken` field)
 - `notion` (Notion OAuth; returns a Notion workspace access token)
 - `linkedin` (LinkedIn OAuth; default JQA preset includes posting scope `w_member_social`; note: typically no refresh token)
@@ -301,7 +301,7 @@ For Apple Music, you will usually want to verify token retrieval with:
 jqa token --provider applemusic --json
 ```
 
-For Google, remember that the JQA server may request sensitive/restricted scopes such as Gmail or Meet, depending on its configured preset.
+For Google, remember that the JQA server may request sensitive/restricted scopes such as Gmail, Meet, or YouTube-related scopes, depending on its configured preset.
 
 For LinkedIn, remember that OAuth success does not always guarantee downstream posting API access - some apps still need LinkedIn product approval.
 
