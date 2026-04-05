@@ -1,6 +1,8 @@
 # jooja-auth-hub-client
 
-Companion **client + micro-CLI** for [`jooja-auth-hub`](../jooja-auth-hub).
+Companion **client + micro-CLI** for **jooja-auth-hub** (service: <https://jooja-auth.leverton.dev>).
+
+This repo is the recommended integration package for other AI agents and internal tools that need to connect to the hub.
 
 Goal: give other internal scripts/agents a single, boring way to:
 - check hub health
