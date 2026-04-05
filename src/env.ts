@@ -66,3 +66,44 @@ export async function getAccessTokenFromEnv(
   });
   return res.accessToken;
 }
+
+export type AppleMusicTokenPair = {
+  developerToken: string;
+  musicUserToken: string;
+  storefront: string | null;
+  issuedAt: string;
+  expiresAt: string | null;
+};
+
+/**
+ * Convenience helper for Apple Music.
+ *
+ * Apple Music requires TWO tokens:
+ * - Developer Token (JWT): `Authorization: Bearer ...`
+ * - Music User Token: `Music-User-Token: ...`
+ */
+export async function getAppleMusicTokensFromEnv(
+  env: Record<string, string | undefined> = process.env,
+  opts?: { minTtlSec?: number; forceRefresh?: boolean }
+): Promise<AppleMusicTokenPair> {
+  const client = createJqaClientFromEnv(env);
+
+  const res: TokenAccessResponse = await client.tokenAccess({
+    providerId: 'applemusic',
+    minTtlSec: opts?.minTtlSec,
+    forceRefresh: opts?.forceRefresh
+  });
+
+  const musicUserToken = res.musicUserToken;
+  if (!musicUserToken) {
+    throw new Error('JQA did not return musicUserToken (is Apple Music connected for this principal?)');
+  }
+
+  return {
+    developerToken: res.accessToken,
+    musicUserToken,
+    storefront: res.storefront ?? null,
+    issuedAt: res.issuedAt,
+    expiresAt: res.expiresAt
+  };
+}

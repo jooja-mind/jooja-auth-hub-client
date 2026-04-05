@@ -48,10 +48,35 @@ export type TokenAccessResponse = {
   principalId: string;
   tokenType: string;
   scope: string | null;
+
+  /**
+   * Provider access token.
+   *
+   * - google: OAuth access_token
+   * - applemusic: Developer Token (JWT) used as `Authorization: Bearer ...`
+   */
   accessToken: string;
+
   issuedAt: string;
   expiresAt: string | null;
-  source: 'cache' | 'refresh';
+
+  /**
+   * Token origin.
+   *
+   * - cache/refresh: typical OAuth providers (google)
+   * - generated: providers where JQA mints a short-lived token on demand (applemusic dev token)
+   */
+  source: 'cache' | 'refresh' | 'generated';
+
+  /**
+   * Apple Music only: Music User Token used as `Music-User-Token: ...`
+   *
+   * Present when `providerId === "applemusic"`.
+   */
+  musicUserToken?: string;
+
+  /** Apple Music only (best-effort): user storefront id like "us", "es". */
+  storefront?: string | null;
 };
 
 export type JqaClientOpts = {

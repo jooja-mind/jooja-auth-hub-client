@@ -7,7 +7,9 @@ Its job is simple:
 - ask for a short-lived access token for some provider
 - give that token to your script, tool, or AI agent
 
-Right now the main provider is `google`, but the idea is that the same flow can later work for other providers too.
+Providers (MVP):
+- `google` (OAuth)
+- `applemusic` (MusicKit JS connect; token response includes an extra `musicUserToken` field)
 
 Default JQA server:
 - `https://jooja-auth.leverton.dev`
@@ -129,6 +131,14 @@ jqa token --json
 
 Useful for debugging.
 
+#### Apple Music note
+
+Apple Music needs **two** tokens:
+- Developer Token (JWT): returned as `accessToken`
+- Music User Token: returned as `musicUserToken`
+
+So for `--provider applemusic` you almost always want `--json`.
+
 ### Force token refresh
 
 ```bash
@@ -224,7 +234,7 @@ console.log(result.accessToken);
 - `JQA_SECRET`
   - your JQA client secret
 - `JQA_PROVIDER`
-  - provider name, for example `google`
+  - provider name, for example `google` or `applemusic`
 
 ### Optional
 
@@ -269,6 +279,8 @@ jqa connect-url
 
 4. Send that URL to the human
 5. Human completes authorization
+   - Google: standard OAuth consent screen
+   - Apple Music: JQA-hosted MusicKit page (Apple login in-browser)
 6. Check status:
 
 ```bash
