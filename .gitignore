@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.DS_Store
+
+# If someone follows the hub pattern locally:
+data/
+*.log

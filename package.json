@@ -1,0 +1,32 @@
+{
+  "name": "jooja-auth-hub-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny client + CLI for talking to jooja-auth-hub (health/connect/status; token-get placeholder).",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "jooja-auth-hub-client": "bin/jooja-auth-hub-client.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "oauth",
+    "tokens",
+    "jooja",
+    "auth",
+    "cli"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
