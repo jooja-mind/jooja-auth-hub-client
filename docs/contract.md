@@ -56,6 +56,10 @@ Known provider ids (server-dependent):
 - `notion`
 - `linkedin`
 
+Notes:
+- Google scope presets are server-defined; a JQA deployment may request broader scopes such as Gmail, Tasks, or Meet.
+- LinkedIn scope presets are also server-defined; posting commonly requires `w_member_social`.
+
 ### Start OAuth (connect URL): `GET /v1/providers/:providerId/auth/start`
 
 Auth (preferred / production):
@@ -138,6 +142,9 @@ Response:
 
 Notes:
 - If the stored token has no `refresh_token`, the service may respond with `409 reauth_required`.
+- Apple Music responses may also include `musicUserToken` alongside `accessToken`.
+- Notion tokens are often treated as long-lived/non-expiring by the server.
+- LinkedIn tokens commonly cannot be refreshed and may require reconnect on expiry.
 
 ## Admin endpoints
 

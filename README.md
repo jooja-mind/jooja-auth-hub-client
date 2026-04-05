@@ -8,10 +8,10 @@ Its job is simple:
 - give that token to your script, tool, or AI agent
 
 Providers:
-- `google` (OAuth; scopes depend on how JQA is configured / what you requested during connect)
+- `google` (OAuth; JQA full preset currently includes Drive, Sheets, Calendar, Gmail, Tasks, and Meet-related scopes)
 - `applemusic` (MusicKit JS connect flow; token response includes an extra `musicUserToken` field)
 - `notion` (Notion OAuth; returns a Notion workspace access token)
-- `linkedin` (LinkedIn OAuth; note: typically no refresh token)
+- `linkedin` (LinkedIn OAuth; default JQA preset includes posting scope `w_member_social`; note: typically no refresh token)
 
 Default JQA server:
 - `https://jooja-auth.leverton.dev`
@@ -110,6 +110,8 @@ This uses your configured `JQA_UUID` + `JQA_SECRET` (Basic-authenticated), not a
 Use this when a human needs to connect a provider account for the first time.
 
 For Apple Music, the printed URL opens a JQA-hosted MusicKit page. The human completes Apple login there, then JQA stores the Music User Token.
+
+For Google and LinkedIn, if you change scopes on the JQA server, generate a new connect URL and reconnect so the updated scope grant is actually issued.
 
 ### Check provider status
 
@@ -285,6 +287,8 @@ jqa connect-url
 5. Human completes authorization
    - Google: standard OAuth consent screen
    - Apple Music: JQA-hosted MusicKit page (Apple login in-browser)
+   - Notion: workspace/integration connect flow
+   - LinkedIn: OAuth consent screen (posting requires the `w_member_social` grant)
 6. Check status:
 
 ```bash
@@ -296,6 +300,10 @@ For Apple Music, you will usually want to verify token retrieval with:
 ```bash
 jqa token --provider applemusic --json
 ```
+
+For Google, remember that the JQA server may request sensitive/restricted scopes such as Gmail or Meet, depending on its configured preset.
+
+For LinkedIn, remember that OAuth success does not always guarantee downstream posting API access - some apps still need LinkedIn product approval.
 
 7. Start requesting access tokens with `jqa token` or the package API
 

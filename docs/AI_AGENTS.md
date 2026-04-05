@@ -1,6 +1,6 @@
 # Jooja Quick Auth (JQA) — Instructions for AI Agents
 
-This doc is for **other AI agents / internal automation** that need provider access tokens (for example Google or Apple Music) without directly handling OAuth refresh tokens.
+This doc is for **other AI agents / internal automation** that need provider access tokens (for example Google, Apple Music, Notion, or LinkedIn) without directly handling OAuth refresh tokens.
 
 JQA is a token vault:
 - humans do the consent flow once
@@ -59,6 +59,8 @@ jqa connect-url
 
 Send the printed URL to the human. They must open it in a browser and complete consent.
 
+If the JQA server changed requested scopes for that provider, generate a fresh connect URL and have the human reconnect so the new grant is actually issued.
+
 Verify token presence:
 
 ```bash
@@ -76,6 +78,10 @@ jqa token --provider applemusic --json
 That response includes both:
 - `accessToken` - Apple Music Developer Token
 - `musicUserToken` - Apple Music Music User Token
+
+For LinkedIn, OAuth success only means the access token was stored. Posting or other advanced APIs can still require separate LinkedIn product approval.
+
+For Google, a server may request sensitive/restricted scopes such as Gmail or Meet depending on how its connect preset is configured.
 
 ## 3) Store credentials locally (outside git)
 
@@ -121,6 +127,8 @@ jqa token --json
 ```
 
 For Apple Music, prefer JSON because the response contains two tokens (`accessToken` and `musicUserToken`).
+
+For Notion and LinkedIn, plain `jqa token` is usually fine unless you want expiry/source metadata for debugging.
 
 Force refresh:
 
