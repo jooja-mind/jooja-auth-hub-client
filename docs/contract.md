@@ -1,26 +1,28 @@
-# Auth Hub Client Contract (v2)
+# Jooja Quick Auth (JQA) Client Contract
 
 This document is written for **other internal scripts/agents**.
 
-> If you change the hub routes, update this file *and* `README.md`.
+> If you change JQA routes, update this file *and* `README.md`.
 
 ## Base URL
 
-- Local dev (default): `http://127.0.0.1:8787`
-- Current public deployment (as of April 2026): `https://jooja-auth.leverton.dev`
+- Default public deployment: `https://jooja-auth.leverton.dev`
+- Local dev (example): `http://127.0.0.1:8787`
 
-## Identity model
+Client default should be the public deployment; override only when needed.
 
-### Principal
+## Identity model (UUID + secret)
+
+### Principal (aka UUID)
 
 A **principal** is *who the tokens belong to*.
 
 In v2, principals are server-issued and opaque:
 
-- `principalId` — UUID (public identifier)
-- `clientSecret` — secret (used to authenticate token retrieval)
+- `principalId` — UUID (we call it `uuid` in client env)
+- `clientSecret` — secret (we call it `secret` in client env)
 
-The hub stores secret verification material; the secret is only returned once at issuance/rotation time.
+The service stores secret verification material; the secret is only returned once at issuance/rotation time.
 
 ### Auth: Basic
 
@@ -31,8 +33,8 @@ Authorization: Basic base64(<principalId>:<clientSecret>)
 ```
 
 Notes:
-- treat `clientSecret` like a password.
-- do not log Basic headers.
+- treat the secret like a password
+- do not log Basic headers
 
 ## Health
 
@@ -44,16 +46,18 @@ Response:
 { "ok": true }
 ```
 
-## Google provider
+## Providers
 
-### Start OAuth (connect URL): `GET /v1/providers/google/auth/start`
+Provider routes are namespaced by provider id.
+
+### Start OAuth (connect URL): `GET /v1/providers/:providerId/auth/start`
 
 Query:
 - `principalId` (required, UUID)
 - `scopes` (optional) — space or comma separated
 
 Behavior:
-- default: HTTP redirect to Google
+- default: HTTP redirect to provider consent page
 - when `Accept: application/json`: returns JSON
 
 JSON response:
@@ -62,11 +66,11 @@ JSON response:
 { "url": "https://accounts.google.com/o/oauth2/v2/auth?..." }
 ```
 
-### Callback: `GET /auth/google/callback`
+### Callback: `GET /auth/:providerId/callback`
 
-This is a browser endpoint. On success the hub stores the token envelope.
+This is a browser endpoint. On success JQA stores the token envelope.
 
-### Status: `GET /v1/providers/google/status`
+### Status: `GET /v1/providers/:providerId/status`
 
 Query:
 - `principalId` (required, UUID)
@@ -79,84 +83,6 @@ Response:
   "providerId": "google",
   "hasToken": true,
   "updatedAt": "2026-04-05T12:34:56.000Z"
-}
-```
-
-## Admin endpoints (optional)
-
-If the hub is configured with `ADMIN_API_KEY`, calls must include:
-
-```
-x-api-key: <ADMIN_API_KEY>
-```
-
-### `GET /v1/admin/stats`
-
-Returns counts (shape may evolve):
-
-```json
-{
-  "ok": true,
-  "principals": 2,
-  "tokens": 2,
-  "byProvider": { "google": 2 }
-}
-```
-
-### `GET /v1/admin/tokens`
-
-Query (optional):
-- `providerId`
-- `principalId`
-
-Response:
-
-```json
-[
-  {
-    "providerId": "google",
-    "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
-    "createdAt": "...",
-    "updatedAt": "..."
-  }
-]
-```
-
-### `POST /v1/admin/principals`
-
-Creates a principal. Returns the `clientSecret` **only once**.
-
-Body (all optional):
-
-```json
-{
-  "displayName": "Ilia",
-  "legacyPrincipalRef": "telegram:540443"
-}
-```
-
-Response (201):
-
-```json
-{
-  "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
-  "clientSecret": "...",
-  "createdAt": "...",
-  "displayName": "Ilia",
-  "legacyPrincipalRef": "telegram:540443"
-}
-```
-
-### Migration helper: `POST /v1/admin/migrate/tokens`
-
-Moves tokens from an old principal key (e.g. `telegram:540443`) to a UUID principal.
-
-Body:
-
-```json
-{
-  "fromPrincipalId": "telegram:540443",
-  "toPrincipalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a"
 }
 ```
 
@@ -199,17 +125,53 @@ Response:
 ```
 
 Notes:
-- Currently only `providerId=google` is supported.
-- If the stored token has no `refresh_token`, the hub responds with `409 reauth_required`.
+- If the stored token has no `refresh_token`, the service may respond with `409 reauth_required`.
 
-## Legacy bearer-mode token retrieval (optional)
+## Admin endpoints (optional)
 
-The hub may still accept:
+If configured with `ADMIN_API_KEY`, calls must include:
 
 ```
-Authorization: Bearer <TOKEN_BEARER_TOKEN>
+x-api-key: <ADMIN_API_KEY>
 ```
 
-…if `TOKEN_BEARER_TOKEN` is configured on the hub.
+### `GET /v1/admin/stats`
 
-This exists for transition only; prefer v2 Basic auth.
+Returns counts (shape may evolve).
+
+### `GET /v1/admin/tokens`
+
+Query (optional):
+- `providerId`
+- `principalId`
+
+Never returns token contents.
+
+### `POST /v1/admin/principals`
+
+Creates a principal. Returns the `clientSecret` **only once**.
+
+Body (all optional):
+
+```json
+{
+  "displayName": "Ilia",
+  "legacyPrincipalRef": "telegram:540443"
+}
+```
+
+Response (201):
+
+```json
+{
+  "principalId": "9d6a6a6d-1fef-4f8c-bfcb-0b4fe4136d8a",
+  "clientSecret": "...",
+  "createdAt": "...",
+  "displayName": "Ilia",
+  "legacyPrincipalRef": "telegram:540443"
+}
+```
+
+### Migration helper: `POST /v1/admin/migrate/tokens`
+
+Moves tokens from an old principal key (e.g. `telegram:540443`) to a UUID principal.

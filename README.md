@@ -1,159 +1,101 @@
-# jooja-auth-hub-client
+# jooja-quick-auth
 
-Companion **client + micro-CLI** for `jooja-auth-hub`.
+**Jooja Quick Auth (JQA)** client library + CLI for obtaining **short-lived provider access tokens** from the JQA service.
 
-Goal: give other internal scripts/agents a single, boring way to:
-- check hub health
-- generate a **human** OAuth connect URL (Google)
-- check whether a principal already has a token stored (status)
-- (admin-only) view token metadata/stats
-- request a **short-lived provider access token** from the hub (Google, MVP)
+- Default service URL is built-in: `https://jooja-auth.leverton.dev`
+- You only set `JQA_BASE_URL` if you need to override it (local/dev/alt deploy)
 
-As of v2, the hub uses a safer identity model:
-- `principalId` — server-issued UUID
-- `clientSecret` — per-principal secret used for authenticated token retrieval
+## Install
 
-Token retrieval returns **access tokens only** (refresh tokens never leave the hub).
-
-## Contract / API surface (v2)
-
-The client assumes the hub endpoints:
-
-- Health:
-  - `GET /health` → `{ ok: true }`
-
-- Principal issuance (admin-only):
-  - `POST /v1/admin/principals` → `{ principalId, clientSecret, ... }`
-
-- Google connect:
-  - `GET /v1/providers/google/auth/start?principalId=<uuid>[&scopes=...]`
-    - default: **redirect** to Google
-    - when `Accept: application/json`: returns `{ url: "https://accounts.google.com/..." }`
-  - `GET /auth/google/callback` (browser redirect target)
-
-- Google token status:
-  - `GET /v1/providers/google/status?principalId=<uuid>` → `{ hasToken, updatedAt, ... }`
-
-- Token retrieval (preferred, per-principal Basic auth):
-  - `POST /v1/tokens/access`
-    - `Authorization: Basic base64(<principalId>:<clientSecret>)`
-
-- Admin (optional):
-  - `GET /v1/admin/stats` (requires `x-api-key` when the hub has `ADMIN_API_KEY`)
-  - `GET /v1/admin/tokens?providerId=...&principalId=...` (never returns token contents)
-  - `GET /v1/admin/principals` (never returns secret verification material)
-
-More detail: see `docs/contract.md`.
-
-## Setup
-
-### Requirements
-
-- Node.js >= 20
-
-### Install
+### As a library
 
 ```bash
-cd /home/powerdot/node/jooja-auth-hub-client
-npm install
-npm run build
+npm i jooja-quick-auth
 ```
 
-### Configure env
+### As an npx tool
 
 ```bash
-cp .env.example .env
-# edit .env
+# Run the CLI without installing globally
+npx -p jooja-quick-auth jqa --help
 ```
 
-For real agent deployments, prefer storing these values in a local secret file outside git, for example:
-- `~/.config/jooja-auth-hub-client/env`
-- or another agent-local secret/env path
+(If/when published, you can also use `npx jooja-quick-auth ...` because the package exports that bin name too.)
 
-Recommended minimum secret set:
-- `AUTH_HUB_BASE_URL`
-- `AUTH_HUB_PRINCIPAL_ID`
-- `AUTH_HUB_CLIENT_SECRET`
+## Env contract (recommended)
 
-Key env vars:
-- `AUTH_HUB_BASE_URL` (default: `http://127.0.0.1:8787`)
-- `AUTH_HUB_PRINCIPAL_ID` (UUID)
-- `AUTH_HUB_CLIENT_SECRET` (secret)
-- `AUTH_HUB_ADMIN_API_KEY` (optional; only for admin endpoints)
+Required:
+- `JQA_UUID` — your JQA principal UUID
+- `JQA_SECRET` — your per-principal secret
+- `JQA_PROVIDER` — provider id (e.g. `google`)
+
+Optional overrides:
+- `JQA_BASE_URL` — override service base URL (default is public)
+- `JQA_ADMIN_API_KEY` — admin-only endpoints
+
+Example (do **not** commit real values):
+
+```bash
+export JQA_UUID="..."
+export JQA_SECRET="..."
+export JQA_PROVIDER="google"
+```
 
 ## CLI usage
 
-Build once:
-
 ```bash
-npm run build
+# Health
+jqa health
+
+# First-time human authorization (send this URL to the human)
+jqa connect-url
+
+# See if a token is stored already
+jqa status
+
+# Get a short-lived access token (prints token only)
+jqa token
+
+# Full JSON response
+jqa token --json
+
+# Force refresh
+jqa token --force-refresh
 ```
 
-Then:
+Overriding from flags:
 
 ```bash
-node dist/cli.js health
-
-# (admin) issue a principal (prints principalId + clientSecret)
-node dist/cli.js admin principal create --display-name "Ilia" --legacy-principal-ref "telegram:540443"
-
-# generate a Google connect URL (send it to a human)
-node dist/cli.js google connect-url --principal-id <uuid>
-
-# status
-node dist/cli.js google status --principal-id <uuid>
-
-# get a Google access token (Basic auth)
-node dist/cli.js token get --providerId google --principal-id <uuid> --client-secret <secret>
+jqa token --provider google --uuid "$JQA_UUID" --secret "$JQA_SECRET"
 ```
 
-Admin endpoints:
+## Library usage
 
-```bash
-node dist/cli.js admin stats --admin-api-key "$AUTH_HUB_ADMIN_API_KEY"
-node dist/cli.js admin tokens --admin-api-key "$AUTH_HUB_ADMIN_API_KEY" --providerId google
-node dist/cli.js admin principals --admin-api-key "$AUTH_HUB_ADMIN_API_KEY"
+```js
+import { JqaClient, getAccessTokenFromEnv } from 'jooja-quick-auth';
+
+// simplest
+const token = await getAccessTokenFromEnv();
+
+// full control
+const client = new JqaClient({ uuid: process.env.JQA_UUID, secret: process.env.JQA_SECRET });
+const res = await client.tokenAccess({ providerId: 'google', minTtlSec: 120 });
+console.log(res.accessToken);
 ```
 
-## Curl examples
+## For AI agents / automation (important)
 
-Health:
+See: **`docs/AI_AGENTS.md`**
 
-```bash
-curl -s "$AUTH_HUB_BASE_URL/health" | jq
-```
+It explains:
+- how to obtain initial `JQA_UUID` + `JQA_SECRET` (admin flow)
+- how to authorize a human for first use
+- how to store credentials locally outside git
+- how to use the CLI/library safely
 
-Get a Google connect URL (non-redirect JSON response):
+## Security notes (read)
 
-```bash
-curl -s \
-  -H 'Accept: application/json' \
-  "$AUTH_HUB_BASE_URL/v1/providers/google/auth/start?principalId=$AUTH_HUB_PRINCIPAL_ID" | jq -r .url
-```
-
-Status:
-
-```bash
-curl -s \
-  "$AUTH_HUB_BASE_URL/v1/providers/google/status?principalId=$AUTH_HUB_PRINCIPAL_ID" | jq
-```
-
-Get an access token (Basic auth):
-
-```bash
-curl -s \
-  -H "Authorization: Basic $(printf '%s:%s' "$AUTH_HUB_PRINCIPAL_ID" "$AUTH_HUB_CLIENT_SECRET" | base64)" \
-  -H 'content-type: application/json' \
-  -d '{"providerId":"google","minTtlSec":120}' \
-  "$AUTH_HUB_BASE_URL/v1/tokens/access" | jq
-```
-
-## Security notes
-
-- Treat `AUTH_HUB_CLIENT_SECRET` like a password.
-- Treat `AUTH_HUB_PRINCIPAL_ID` + `AUTH_HUB_CLIENT_SECRET` together as a credential pair.
-- Do not log authorization headers.
-- Do not store real principal/secret values in git-tracked files.
-- The hub is a token vault. Don’t expose it to the public internet without protections.
-
-See `AGENT.md` for stricter operational rules.
+- Treat `JQA_SECRET` like a password.
+- Treat `JQA_UUID` + `JQA_SECRET` together as a credential pair.
+- **Do not commit** secrets or tokens.
+- Avoid pasting tokens into chat logs; prefer piping to the process that needs it.

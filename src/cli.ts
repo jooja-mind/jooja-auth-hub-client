@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-import { AuthHubClient } from './client.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { DEFAULT_JQA_BASE_URL, JqaClient } from './client.js';
+import { loadJqaEnv } from './env.js';
 
 type ParsedArgs = {
   positionals: string[];
@@ -40,6 +45,14 @@ function parseArgs(argv: string[]): ParsedArgs {
       continue;
     }
 
+    if (a.startsWith('-') && a.length > 1) {
+      // minimal short-flag support: -h / -v
+      if (a === '-h') flags.h = true;
+      else if (a === '-v') flags.v = true;
+      else positionals.push(a);
+      continue;
+    }
+
     positionals.push(a);
   }
 
@@ -55,48 +68,47 @@ function hasFlag(flags: Record<string, string | boolean>, name: string): boolean
   return Boolean(flags[name]);
 }
 
+function die(msg: string, code = 1): never {
+  // eslint-disable-next-line no-console
+  console.error(msg);
+  process.exit(code);
+}
+
+function getVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkgPath = join(here, '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 function usage(exitCode = 0) {
-  const msg = `jooja-auth-hub-client
+  const msg = `jqa — Jooja Quick Auth CLI
 
 Usage:
-  jooja-auth-hub-client health [--base-url <url>]
+  jqa token [--provider <id>] [--uuid <uuid>] [--secret <secret>] [--min-ttl-sec 120] [--force-refresh] [--json]
+  jqa connect-url [--provider <id>] [--uuid <uuid>] [--scopes "scope1 scope2"]
+  jqa status [--provider <id>] [--uuid <uuid>]
+  jqa health
 
-  # Google connect
-  jooja-auth-hub-client google connect-url --principal-id <uuid> [--scopes "scope1 scope2"]
-  jooja-auth-hub-client google status --principal-id <uuid>
+  # Admin (issues a new UUID+secret)
+  jqa admin principal create [--display-name "Ilia"] [--legacy-principal-ref "telegram:540443"] [--admin-api-key <key>]
 
-  # Token retrieval (preferred: per-principal clientSecret)
-  jooja-auth-hub-client token get --providerId <provider> [--principal-id <uuid>] [--client-secret <secret>] [--min-ttl-sec 120] [--force-refresh]
+Env (recommended):
+  JQA_UUID
+  JQA_SECRET
+  JQA_PROVIDER
 
-  # Admin
-  jooja-auth-hub-client admin stats [--admin-api-key <key>]
-  jooja-auth-hub-client admin tokens [--providerId google] [--principalId <uuid>] [--admin-api-key <key>]
-  jooja-auth-hub-client admin principals [--admin-api-key <key>]
-  jooja-auth-hub-client admin principal create [--display-name "Ilia"] [--legacy-principal-ref "telegram:540443"] [--admin-api-key <key>]
+Optional overrides:
+  JQA_BASE_URL        (default: ${DEFAULT_JQA_BASE_URL})
+  JQA_ADMIN_API_KEY   (admin-only)
 
-Env vars:
-  AUTH_HUB_BASE_URL         (default http://127.0.0.1:8787)
-  AUTH_HUB_ADMIN_API_KEY    (optional; for /v1/admin/*)
-
-  # v2 identity (preferred)
-  AUTH_HUB_PRINCIPAL_ID     (uuid)
-  AUTH_HUB_CLIENT_SECRET    (secret)
-
-  # legacy shared bearer token mode (optional)
-  AUTH_HUB_BEARER_TOKEN
-
-Examples:
-  # Health
-  jooja-auth-hub-client health
-
-  # Create a new principal (admin)
-  jooja-auth-hub-client admin principal create --display-name "Ilia" --legacy-principal-ref "telegram:540443"
-
-  # Get a connect URL
-  jooja-auth-hub-client google connect-url --principal-id <uuid>
-
-  # Get a Google access token
-  jooja-auth-hub-client token get --providerId google --principal-id <uuid> --client-secret <secret>
+Notes:
+  - token prints the raw access token by default (good for scripts).
+  - use --json to print the full response object.
 `;
 
   // eslint-disable-next-line no-console
@@ -107,22 +119,32 @@ Examples:
 async function main() {
   const { positionals, flags } = parseArgs(process.argv.slice(2));
   if (positionals.length === 0 || hasFlag(flags, 'help') || hasFlag(flags, 'h')) usage(0);
+  if (hasFlag(flags, 'version') || hasFlag(flags, 'v')) {
+    // eslint-disable-next-line no-console
+    console.log(getVersion());
+    return;
+  }
 
-  const baseUrl = (getFlag(flags, 'base-url') ?? process.env.AUTH_HUB_BASE_URL ?? 'http://127.0.0.1:8787').replace(
-    /\/+$/,
-    ''
-  );
-  const adminApiKey = getFlag(flags, 'admin-api-key') ?? process.env.AUTH_HUB_ADMIN_API_KEY;
+  const cfg = loadJqaEnv(process.env);
 
-  const principalId = getFlag(flags, 'principal-id') ?? process.env.AUTH_HUB_PRINCIPAL_ID;
-  const clientSecret = getFlag(flags, 'client-secret') ?? process.env.AUTH_HUB_CLIENT_SECRET;
+  const baseUrl = (getFlag(flags, 'base-url') ?? cfg.baseUrl ?? DEFAULT_JQA_BASE_URL).replace(/\/+$/, '');
+  const uuid = getFlag(flags, 'uuid') ?? getFlag(flags, 'principal-id') ?? cfg.uuid;
+  const secret = getFlag(flags, 'secret') ?? getFlag(flags, 'client-secret') ?? cfg.secret;
+  let providerId = getFlag(flags, 'provider') ?? getFlag(flags, 'providerId') ?? cfg.provider;
+  const adminApiKey = getFlag(flags, 'admin-api-key') ?? cfg.adminApiKey;
 
-  // legacy
-  const bearerToken = getFlag(flags, 'bearer-token') ?? process.env.AUTH_HUB_BEARER_TOKEN;
+  const client = new JqaClient({ baseUrl, uuid, secret, adminApiKey, bearerToken: cfg.bearerToken });
 
-  const client = new AuthHubClient({ baseUrl, adminApiKey, principalId, clientSecret, bearerToken });
+  let [cmd1, cmd2, cmd3] = positionals;
 
-  const [cmd1, cmd2, cmd3] = positionals;
+  // Backwards-ish compatibility for older patterns:
+  //   jqa google connect-url
+  //   jqa google status
+  if (cmd2 === 'connect-url' || cmd2 === 'status') {
+    if (!providerId) providerId = cmd1;
+    cmd1 = cmd2;
+    cmd2 = cmd3;
+  }
 
   if (cmd1 === 'health') {
     const res = await client.health();
@@ -131,47 +153,49 @@ async function main() {
     return;
   }
 
-  if (cmd1 === 'google' && cmd2 === 'connect-url') {
-    const pid = principalId ?? getFlag(flags, 'principal-id');
-    if (!pid) throw new Error('Missing --principal-id (or AUTH_HUB_PRINCIPAL_ID)');
+  if (cmd1 === 'connect-url') {
+    if (!providerId) die('Missing provider id (set JQA_PROVIDER or pass --provider)');
+    if (!uuid) die('Missing uuid (set JQA_UUID or pass --uuid)');
 
     const scopes = getFlag(flags, 'scopes');
-    const url = await client.googleConnectUrl({ principalId: pid, scopes });
+    const url = await client.connectUrl({ providerId, uuid, scopes });
     // eslint-disable-next-line no-console
     console.log(url);
     return;
   }
 
-  if (cmd1 === 'google' && cmd2 === 'status') {
-    const pid = principalId ?? getFlag(flags, 'principal-id');
-    if (!pid) throw new Error('Missing --principal-id (or AUTH_HUB_PRINCIPAL_ID)');
+  if (cmd1 === 'status') {
+    if (!providerId) die('Missing provider id (set JQA_PROVIDER or pass --provider)');
+    if (!uuid) die('Missing uuid (set JQA_UUID or pass --uuid)');
 
-    const res = await client.googleStatus({ principalId: pid });
+    const res = await client.status({ providerId, uuid });
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(res, null, 2));
     return;
   }
 
-  if (cmd1 === 'admin' && cmd2 === 'stats') {
-    const res = await client.adminStats();
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
+  if (cmd1 === 'token' || cmd1 === 'access-token') {
+    if (!providerId) die('Missing provider id (set JQA_PROVIDER or pass --provider)');
+    if (!uuid) die('Missing uuid (set JQA_UUID or pass --uuid)');
+    if (!secret) die('Missing secret (set JQA_SECRET or pass --secret)');
 
-  if (cmd1 === 'admin' && cmd2 === 'tokens') {
-    const providerId = getFlag(flags, 'providerId');
-    const p = getFlag(flags, 'principalId');
-    const res = await client.adminTokens({ providerId, principalId: p });
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
+    const minTtlSecRaw = getFlag(flags, 'min-ttl-sec');
+    const minTtlSec = minTtlSecRaw ? Number(minTtlSecRaw) : undefined;
+    if (minTtlSecRaw && Number.isNaN(minTtlSec ?? NaN)) die('Invalid --min-ttl-sec (expected number)');
 
-  if (cmd1 === 'admin' && cmd2 === 'principals') {
-    const res = await client.adminPrincipals();
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(res, null, 2));
+    const forceRefresh = hasFlag(flags, 'force-refresh');
+
+    const res = await client.tokenAccess({ providerId, uuid, secret, minTtlSec, forceRefresh });
+
+    if (hasFlag(flags, 'json')) {
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify(res, null, 2));
+    } else {
+      // stdout-friendly: token only
+      // eslint-disable-next-line no-console
+      console.log(res.accessToken);
+    }
+
     return;
   }
 
@@ -179,32 +203,14 @@ async function main() {
     const displayName = getFlag(flags, 'display-name');
     const legacyPrincipalRef = getFlag(flags, 'legacy-principal-ref');
 
+    if (!adminApiKey) die('Missing admin API key (set JQA_ADMIN_API_KEY or pass --admin-api-key)');
+
     const res = await client.adminCreatePrincipal({ displayName, legacyPrincipalRef });
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(res, null, 2));
     return;
   }
 
-  if (cmd1 === 'token' && cmd2 === 'get') {
-    const providerId = getFlag(flags, 'providerId');
-    if (!providerId) throw new Error('Missing --providerId');
-
-    const pid = principalId ?? getFlag(flags, 'principal-id');
-    const secret = clientSecret ?? getFlag(flags, 'client-secret');
-    if (!pid) throw new Error('Missing --principal-id (or AUTH_HUB_PRINCIPAL_ID)');
-    if (!secret) throw new Error('Missing --client-secret (or AUTH_HUB_CLIENT_SECRET)');
-
-    const minTtlSecRaw = getFlag(flags, 'min-ttl-sec');
-    const minTtlSec = minTtlSecRaw ? Number(minTtlSecRaw) : undefined;
-    const forceRefresh = hasFlag(flags, 'force-refresh');
-
-    const res = await client.tokenAccess({ principalId: pid, clientSecret: secret, providerId, minTtlSec, forceRefresh });
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
-
-  // Unknown command
   usage(1);
 }
 

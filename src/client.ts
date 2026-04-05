@@ -1,8 +1,12 @@
+export const DEFAULT_JQA_BASE_URL = 'https://jooja-auth.leverton.dev';
+
 export type HealthResponse = { ok: true };
 
-export type GoogleStatusResponse = {
+export type ProviderStatusResponse = {
+  /** UUID (principal id). */
   principalId: string;
-  providerId: 'google';
+  /** Provider id (e.g. "google"). */
+  providerId: string;
   hasToken: boolean;
   updatedAt: string | null;
 };
@@ -50,15 +54,20 @@ export type TokenAccessResponse = {
   source: 'cache' | 'refresh';
 };
 
-export type AuthHubClientOpts = {
-  baseUrl: string;
+export type JqaClientOpts = {
+  /** Base URL override. If omitted, defaults to the public JQA deployment. */
+  baseUrl?: string;
+
+  /** Optional: admin API key for /v1/admin/* endpoints. */
   adminApiKey?: string;
 
-  /** v2 identity (preferred) */
-  principalId?: string;
-  clientSecret?: string;
+  /** UUID principal id (JQA_UUID). */
+  uuid?: string;
 
-  /** legacy shared bearer token (optional; backward compat) */
+  /** Per-principal secret (JQA_SECRET). */
+  secret?: string;
+
+  /** Legacy shared bearer token (transition only). Prefer UUID+secret. */
   bearerToken?: string;
 };
 
@@ -66,18 +75,18 @@ function basicAuthHeader(user: string, pass: string): string {
   return `Basic ${Buffer.from(`${user}:${pass}`, 'utf8').toString('base64')}`;
 }
 
-export class AuthHubClient {
+export class JqaClient {
   readonly baseUrl: string;
   readonly adminApiKey?: string;
-  readonly principalId?: string;
-  readonly clientSecret?: string;
+  readonly uuid?: string;
+  readonly secret?: string;
   readonly bearerToken?: string;
 
-  constructor(opts: AuthHubClientOpts) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
+  constructor(opts: JqaClientOpts = {}) {
+    this.baseUrl = (opts.baseUrl ?? DEFAULT_JQA_BASE_URL).replace(/\/+$/, '');
     this.adminApiKey = opts.adminApiKey;
-    this.principalId = opts.principalId;
-    this.clientSecret = opts.clientSecret;
+    this.uuid = opts.uuid;
+    this.secret = opts.secret;
     this.bearerToken = opts.bearerToken;
   }
 
@@ -135,15 +144,22 @@ export class AuthHubClient {
   }
 
   /**
-   * Returns the Google OAuth consent URL.
+   * Returns the provider OAuth consent URL.
    *
-   * The hub redirects by default, but if we set Accept: application/json,
-   * it returns { url } instead.
+   * JQA redirects by default, but when `Accept: application/json` is set,
+   * it returns `{ url }` instead.
    */
-  async googleConnectUrl(opts: { principalId: string; scopes?: string }): Promise<string> {
-    const res = await this.fetchJson<{ url: string }>('GET', '/v1/providers/google/auth/start', {
-      query: { principalId: opts.principalId, scopes: opts.scopes }
-    });
+  async connectUrl(opts: { providerId: string; uuid?: string; scopes?: string }): Promise<string> {
+    const principalId = opts.uuid ?? this.uuid;
+    if (!principalId) throw new Error('Missing uuid (JQA_UUID)');
+
+    const res = await this.fetchJson<{ url: string }>(
+      'GET',
+      `/v1/providers/${encodeURIComponent(opts.providerId)}/auth/start`,
+      {
+        query: { principalId, scopes: opts.scopes }
+      }
+    );
 
     if ('json' in res && res.status === 200 && typeof res.json.url === 'string') return res.json.url;
 
@@ -154,10 +170,17 @@ export class AuthHubClient {
     throw new Error(`Failed to build connect url: HTTP ${res.status} ${res.text}`);
   }
 
-  async googleStatus(opts: { principalId: string }): Promise<GoogleStatusResponse> {
-    const res = await this.fetchJson<GoogleStatusResponse>('GET', '/v1/providers/google/status', {
-      query: { principalId: opts.principalId }
-    });
+  async status(opts: { providerId: string; uuid?: string }): Promise<ProviderStatusResponse> {
+    const principalId = opts.uuid ?? this.uuid;
+    if (!principalId) throw new Error('Missing uuid (JQA_UUID)');
+
+    const res = await this.fetchJson<ProviderStatusResponse>(
+      'GET',
+      `/v1/providers/${encodeURIComponent(opts.providerId)}/status`,
+      {
+        query: { principalId }
+      }
+    );
 
     if ('json' in res && res.status === 200) return res.json;
 
@@ -169,7 +192,7 @@ export class AuthHubClient {
   }
 
   async adminStats(): Promise<AdminStatsResponse> {
-    if (!this.adminApiKey) throw new Error('Missing adminApiKey (AUTH_HUB_ADMIN_API_KEY)');
+    if (!this.adminApiKey) throw new Error('Missing adminApiKey (JQA_ADMIN_API_KEY)');
 
     const res = await this.fetchJson<AdminStatsResponse>('GET', '/v1/admin/stats', {
       headers: {
@@ -186,11 +209,11 @@ export class AuthHubClient {
     throw new Error(`Failed admin stats: HTTP ${res.status} ${res.text}`);
   }
 
-  async adminTokens(filter?: { providerId?: string; principalId?: string }): Promise<AdminTokenListItem[]> {
-    if (!this.adminApiKey) throw new Error('Missing adminApiKey (AUTH_HUB_ADMIN_API_KEY)');
+  async adminTokens(filter?: { providerId?: string; uuid?: string }): Promise<AdminTokenListItem[]> {
+    if (!this.adminApiKey) throw new Error('Missing adminApiKey (JQA_ADMIN_API_KEY)');
 
     const res = await this.fetchJson<AdminTokenListItem[]>('GET', '/v1/admin/tokens', {
-      query: { providerId: filter?.providerId, principalId: filter?.principalId },
+      query: { providerId: filter?.providerId, principalId: filter?.uuid },
       headers: {
         'x-api-key': this.adminApiKey
       }
@@ -206,7 +229,7 @@ export class AuthHubClient {
   }
 
   async adminPrincipals(): Promise<AdminPrincipalListItem[]> {
-    if (!this.adminApiKey) throw new Error('Missing adminApiKey (AUTH_HUB_ADMIN_API_KEY)');
+    if (!this.adminApiKey) throw new Error('Missing adminApiKey (JQA_ADMIN_API_KEY)');
 
     const res = await this.fetchJson<AdminPrincipalListItem[]>('GET', '/v1/admin/principals', {
       headers: {
@@ -224,7 +247,7 @@ export class AuthHubClient {
   }
 
   async adminCreatePrincipal(opts?: { displayName?: string; legacyPrincipalRef?: string }): Promise<AdminCreatePrincipalResponse> {
-    if (!this.adminApiKey) throw new Error('Missing adminApiKey (AUTH_HUB_ADMIN_API_KEY)');
+    if (!this.adminApiKey) throw new Error('Missing adminApiKey (JQA_ADMIN_API_KEY)');
 
     const res = await this.fetchJson<AdminCreatePrincipalResponse>('POST', '/v1/admin/principals', {
       headers: {
@@ -246,24 +269,24 @@ export class AuthHubClient {
   }
 
   /**
-   * Request a short-lived provider access token from the hub.
+   * Request a short-lived provider access token from JQA.
    *
-   * Preferred auth: `Authorization: Basic base64(principalId:clientSecret)`.
+   * Preferred auth: `Authorization: Basic base64(uuid:secret)`.
    *
-   * The hub returns access tokens only (refresh token never leaves the hub).
+   * JQA returns access tokens only (refresh token never leaves the service).
    */
   async tokenAccess(opts: {
     providerId: string;
     minTtlSec?: number;
     forceRefresh?: boolean;
-    principalId?: string;
-    clientSecret?: string;
+    uuid?: string;
+    secret?: string;
   }): Promise<TokenAccessResponse> {
-    const principalId = opts.principalId ?? this.principalId;
-    const clientSecret = opts.clientSecret ?? this.clientSecret;
+    const principalId = opts.uuid ?? this.uuid;
+    const clientSecret = opts.secret ?? this.secret;
 
-    if (!principalId) throw new Error('Missing principalId (AUTH_HUB_PRINCIPAL_ID)');
-    if (!clientSecret) throw new Error('Missing clientSecret (AUTH_HUB_CLIENT_SECRET)');
+    if (!principalId) throw new Error('Missing uuid (JQA_UUID)');
+    if (!clientSecret) throw new Error('Missing secret (JQA_SECRET)');
 
     const res = await this.fetchJson<TokenAccessResponse>('POST', '/v1/tokens/access', {
       headers: { authorization: basicAuthHeader(principalId, clientSecret) },
@@ -286,7 +309,7 @@ export class AuthHubClient {
   /**
    * Legacy Bearer-mode token retrieval for older scripts.
    *
-   * Requires hub-side TOKEN_BEARER_TOKEN and client-side AUTH_HUB_BEARER_TOKEN.
+   * Requires hub-side TOKEN_BEARER_TOKEN and client-side JQA_BEARER_TOKEN.
    */
   async tokenAccessLegacyBearer(opts: {
     principalId: string;
@@ -294,7 +317,7 @@ export class AuthHubClient {
     minTtlSec?: number;
     forceRefresh?: boolean;
   }): Promise<TokenAccessResponse | null> {
-    if (!this.bearerToken) throw new Error('Missing bearerToken (AUTH_HUB_BEARER_TOKEN)');
+    if (!this.bearerToken) throw new Error('Missing bearerToken (JQA_BEARER_TOKEN)');
 
     const res = await this.fetchJson<TokenAccessResponse>('POST', '/v1/tokens/access', {
       headers: { authorization: `Bearer ${this.bearerToken}` },
@@ -314,5 +337,41 @@ export class AuthHubClient {
     }
 
     throw new Error(`tokenAccessLegacyBearer failed: HTTP ${res.status} ${res.text}`);
+  }
+}
+
+/**
+ * Backwards-compatible alias for older internal code.
+ *
+ * @deprecated Prefer `JqaClient`.
+ */
+export type AuthHubClientOpts = {
+  baseUrl: string;
+  adminApiKey?: string;
+  principalId?: string;
+  clientSecret?: string;
+  bearerToken?: string;
+};
+
+/**
+ * @deprecated Prefer `JqaClient`.
+ */
+export class AuthHubClient extends JqaClient {
+  constructor(opts: AuthHubClientOpts) {
+    super({
+      baseUrl: opts.baseUrl,
+      adminApiKey: opts.adminApiKey,
+      uuid: opts.principalId,
+      secret: opts.clientSecret,
+      bearerToken: opts.bearerToken
+    });
+  }
+
+  async googleConnectUrl(opts: { principalId: string; scopes?: string }): Promise<string> {
+    return this.connectUrl({ providerId: 'google', uuid: opts.principalId, scopes: opts.scopes });
+  }
+
+  async googleStatus(opts: { principalId: string }): Promise<ProviderStatusResponse> {
+    return this.status({ providerId: 'google', uuid: opts.principalId });
   }
 }
