@@ -1,39 +1,209 @@
 # jooja-quick-auth
 
-**Jooja Quick Auth (JQA)** client library + CLI for obtaining **short-lived provider access tokens** from the JQA service.
+`jooja-quick-auth` is a small client for **Jooja Quick Auth (JQA)**.
 
-- Default service URL is built-in: `https://jooja-auth.leverton.dev`
-- You only set `JQA_BASE_URL` if you need to override it (local/dev/alt deploy)
+Its job is simple:
+- talk to the JQA server
+- ask for a short-lived access token for some provider
+- give that token to your script, tool, or AI agent
 
-## Install
+Right now the main provider is `google`, but the idea is that the same flow can later work for other providers too.
 
-### As a library
+Default JQA server:
+- `https://jooja-auth.leverton.dev`
+
+You do **not** need to set the base URL unless you want to override it.
+
+---
+
+## 1. What this is
+
+This package solves one annoying problem:
+
+You want a project or an AI agent to work with Google Drive / Calendar / Sheets, but you do **not** want every project to reimplement OAuth, token refresh, callback handling, and secret storage from scratch.
+
+So instead:
+- a user authorizes once through JQA
+- the client gets a short-lived provider access token from JQA
+- your script/tool uses that token with the provider API
+
+Think of this package as:
+- a **tiny auth helper** for apps and agents
+- plus a **CLI** for quick manual use
+
+---
+
+## 2. When to use the CLI
+
+Use the CLI when you want something quick and practical, for example:
+- check that JQA is alive
+- generate a connect URL for a human
+- check whether authorization already exists
+- print an access token for a shell script or one-off command
+
+Good CLI use cases:
+- testing setup
+- quick local scripts
+- shell automation
+- debugging an integration
+
+### Install / run the CLI
+
+#### With npm install
 
 ```bash
 npm i jooja-quick-auth
 ```
 
-### As an npx tool
+Then use the bin:
 
 ```bash
-# Run the CLI without installing globally
+jqa --help
+```
+
+#### With npx
+
+```bash
 npx -p jooja-quick-auth jqa --help
 ```
 
-(If/when published, you can also use `npx jooja-quick-auth ...` because the package exports that bin name too.)
+---
 
-## Env contract (recommended)
+## 3. CLI commands
 
-Required:
-- `JQA_UUID` — your JQA principal UUID
-- `JQA_SECRET` — your per-principal secret
-- `JQA_PROVIDER` — provider id (e.g. `google`)
+### Health check
 
-Optional overrides:
-- `JQA_BASE_URL` — override service base URL (default is public)
-- `JQA_ADMIN_API_KEY` — admin-only endpoints
+```bash
+jqa health
+```
 
-Example (do **not** commit real values):
+Checks whether the JQA server is reachable.
+
+### Generate a connect URL
+
+```bash
+jqa connect-url
+```
+
+Use this when a human needs to connect a provider account for the first time.
+
+### Check provider status
+
+```bash
+jqa status
+```
+
+Shows whether JQA already has token material for the current provider.
+
+### Get an access token
+
+```bash
+jqa token
+```
+
+Prints a short-lived access token only.
+
+### Get full token response as JSON
+
+```bash
+jqa token --json
+```
+
+Useful for debugging.
+
+### Force token refresh
+
+```bash
+jqa token --force-refresh
+```
+
+### Override values from flags
+
+```bash
+jqa token \
+  --provider google \
+  --uuid "$JQA_UUID" \
+  --secret "$JQA_SECRET"
+```
+
+---
+
+## 4. When to use it as a package
+
+Use the package API when you are writing:
+- a Node.js project
+- a reusable tool
+- an AI agent integration
+- a script that should fetch tokens programmatically
+
+This is the better option when:
+- you do not want to shell out to a CLI
+- you want cleaner code
+- you want to fetch a token inside your app flow
+
+---
+
+## 5. How to use it as a package
+
+### Install
+
+```bash
+npm i jooja-quick-auth
+```
+
+### Simplest usage
+
+```js
+import { getAccessTokenFromEnv } from 'jooja-quick-auth';
+
+const token = await getAccessTokenFromEnv();
+console.log(token);
+```
+
+This reads config from env variables.
+
+### Full client usage
+
+```js
+import { JqaClient } from 'jooja-quick-auth';
+
+const client = new JqaClient({
+  uuid: process.env.JQA_UUID,
+  secret: process.env.JQA_SECRET,
+  baseUrl: process.env.JQA_BASE_URL, // optional
+});
+
+const result = await client.tokenAccess({
+  providerId: process.env.JQA_PROVIDER || 'google',
+  minTtlSec: 120,
+});
+
+console.log(result.accessToken);
+```
+
+---
+
+## 6. Required environment variables
+
+### Required
+
+- `JQA_UUID`
+  - your JQA principal UUID
+- `JQA_SECRET`
+  - your JQA client secret
+- `JQA_PROVIDER`
+  - provider name, for example `google`
+
+### Optional
+
+- `JQA_BASE_URL`
+  - override JQA base URL
+  - default is already built in:
+    - `https://jooja-auth.leverton.dev`
+- `JQA_ADMIN_API_KEY`
+  - only needed for admin flows
+
+### Example
 
 ```bash
 export JQA_UUID="..."
@@ -41,61 +211,66 @@ export JQA_SECRET="..."
 export JQA_PROVIDER="google"
 ```
 
-## CLI usage
+### Recommended storage
+
+For real projects and agents, store these in a local secret/env file outside git, for example:
+- `~/.config/jooja-auth-hub-client/env`
+- or your agent's own secret path
+
+Do **not** commit real values.
+
+---
+
+## 7. Typical workflow
+
+### First-time setup
+
+1. Get `JQA_UUID` and `JQA_SECRET`
+2. Store them locally outside git
+3. Generate a connect URL:
 
 ```bash
-# Health
-jqa health
-
-# First-time human authorization (send this URL to the human)
 jqa connect-url
-
-# See if a token is stored already
-jqa status
-
-# Get a short-lived access token (prints token only)
-jqa token
-
-# Full JSON response
-jqa token --json
-
-# Force refresh
-jqa token --force-refresh
 ```
 
-Overriding from flags:
+4. Send that URL to the human
+5. Human completes authorization
+6. Check status:
 
 ```bash
-jqa token --provider google --uuid "$JQA_UUID" --secret "$JQA_SECRET"
+jqa status
 ```
 
-## Library usage
+7. Start requesting access tokens with `jqa token` or the package API
 
-```js
-import { JqaClient, getAccessTokenFromEnv } from 'jooja-quick-auth';
+### Ongoing use
 
-// simplest
-const token = await getAccessTokenFromEnv();
+After first authorization, your project or agent usually only needs:
+- `JQA_UUID`
+- `JQA_SECRET`
+- `JQA_PROVIDER`
 
-// full control
-const client = new JqaClient({ uuid: process.env.JQA_UUID, secret: process.env.JQA_SECRET });
-const res = await client.tokenAccess({ providerId: 'google', minTtlSec: 120 });
-console.log(res.accessToken);
-```
+Then it can ask JQA for short-lived access tokens whenever needed.
 
-## For AI agents / automation (important)
+---
 
-See: **`docs/AI_AGENTS.md`**
+## 8. For AI agents
 
-It explains:
-- how to obtain initial `JQA_UUID` + `JQA_SECRET` (admin flow)
-- how to authorize a human for first use
-- how to store credentials locally outside git
-- how to use the CLI/library safely
+If this package is being used by another AI agent, read:
+- `docs/AI_AGENTS.md`
 
-## Security notes (read)
+That file explains:
+- how to get initial credentials
+- how to onboard a human
+- how to store secrets safely
+- how to use the package/CLI without leaking tokens
+
+---
+
+## 9. Security notes
 
 - Treat `JQA_SECRET` like a password.
 - Treat `JQA_UUID` + `JQA_SECRET` together as a credential pair.
-- **Do not commit** secrets or tokens.
-- Avoid pasting tokens into chat logs; prefer piping to the process that needs it.
+- Do **not** commit secrets or tokens.
+- Do not dump tokens into logs or chat unless absolutely necessary.
+- Prefer piping the token directly into the process that needs it.
