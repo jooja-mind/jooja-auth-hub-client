@@ -16,6 +16,13 @@ A credential pair issued by JQA:
 And the provider you want:
 - `JQA_PROVIDER` (example: `google`)
 
+For a new project, preferred practical flow:
+1. Look for an existing UUID+secret in saved local secrets first.
+2. If none exists, ask the user/operator for them.
+3. Create a project `.env` file.
+4. Put `JQA_UUID`, `JQA_SECRET`, `JQA_PROVIDER`, and optionally `JQA_BASE_URL` there.
+5. In code, start with `const accessToken = await getAccessTokenFromEnv();`.
+
 Optional:
 - `JQA_BASE_URL` only if you are not using the default public deployment
 

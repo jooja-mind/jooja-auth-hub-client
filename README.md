@@ -184,6 +184,23 @@ This is the better option when:
 
 ## 5. How to use it as a package
 
+### The practical setup flow for a new project
+
+When you connect a brand new project to JQA, keep it this simple:
+
+1. Find an existing `JQA_UUID` + `JQA_SECRET` in saved local secrets.
+   - If you do not have them, ask the user/operator for them.
+2. Create a `.env` file inside the project.
+3. Put the JQA variables into that `.env` file.
+4. Install `jooja-quick-auth` from GitHub.
+5. In code, start with:
+
+```js
+const accessToken = await getAccessTokenFromEnv();
+```
+
+6. Use that access token against the provider API you actually need.
+
 ### Install
 
 Install directly from GitHub:
@@ -201,6 +218,24 @@ If you prefer package.json syntax explicitly:
   }
 }
 ```
+
+### Create `.env` in the target project
+
+Example:
+
+```bash
+cat > .env <<'EOF'
+JQA_UUID="your-principal-uuid"
+JQA_SECRET="your-client-secret"
+JQA_PROVIDER="google"
+JQA_BASE_URL="https://jooja-auth.leverton.dev"
+EOF
+```
+
+Where to get the values:
+- First, check your saved local secrets / env files.
+- If you do not already have a usable principal and secret, ask the user/operator.
+- Do not invent credentials and do not commit real secrets.
 
 ### Simplest usage
 
@@ -264,7 +299,7 @@ export JQA_SECRET="..."
 export JQA_PROVIDER="google"
 ```
 
-Or put them in a local `.env` / secret file outside git and let your project load them.
+For a normal app project, prefer a local `.env` file in the project root and load it at runtime.
 
 ### Recommended storage
 
@@ -280,21 +315,22 @@ Do **not** commit real values.
 
 ### First-time setup
 
-1. Get `JQA_UUID` and `JQA_SECRET`
+1. Find `JQA_UUID` and `JQA_SECRET` in saved secrets, or ask the user/operator for them
 2. Store them locally outside git
-3. Generate a connect URL:
+3. Create a project `.env`
+4. Generate a connect URL:
 
 ```bash
 jqa connect-url
 ```
 
-4. Send that URL to the human
-5. Human completes authorization
+5. Send that URL to the human
+6. Human completes authorization
    - Google: standard OAuth consent screen
    - Apple Music: JQA-hosted MusicKit page (Apple login in-browser)
    - Notion: workspace/integration connect flow
    - LinkedIn: OAuth consent screen (posting requires the `w_member_social` grant)
-6. Check status:
+7. Check status:
 
 ```bash
 jqa status
@@ -310,7 +346,7 @@ For Google, remember that the JQA server may request sensitive/restricted scopes
 
 For LinkedIn, remember that OAuth success does not always guarantee downstream posting API access - some apps still need LinkedIn product approval.
 
-7. Start requesting access tokens with `jqa token` or the package API
+8. Start requesting access tokens with `jqa token` or the package API
 
 ### Ongoing use
 
