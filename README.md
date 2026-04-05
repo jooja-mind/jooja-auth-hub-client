@@ -8,8 +8,10 @@ Its job is simple:
 - give that token to your script, tool, or AI agent
 
 Providers:
-- `google` (OAuth)
-- `applemusic` (working MusicKit JS connect flow; token response includes an extra `musicUserToken` field)
+- `google` (OAuth; scopes depend on how JQA is configured / what you requested during connect)
+- `applemusic` (MusicKit JS connect flow; token response includes an extra `musicUserToken` field)
+- `notion` (Notion OAuth; returns a Notion workspace access token)
+- `linkedin` (LinkedIn OAuth; note: typically no refresh token)
 
 Default JQA server:
 - `https://jooja-auth.leverton.dev`

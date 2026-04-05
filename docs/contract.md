@@ -50,6 +50,12 @@ Response:
 
 Provider routes are namespaced by provider id.
 
+Known provider ids (server-dependent):
+- `google`
+- `applemusic`
+- `notion`
+- `linkedin`
+
 ### Start OAuth (connect URL): `GET /v1/providers/:providerId/auth/start`
 
 Auth (preferred / production):
