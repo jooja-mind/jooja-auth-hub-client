@@ -20,10 +20,13 @@ You do **not** need to set the base URL unless you want to override it.
 
 ---
 
-## Example project
+## Example projects
 
-If you want to see the smallest practical example using this client with Google Drive, see:
-- https://github.com/jooja-mind/google-drive
+Small, practical example projects:
+- Google Drive: https://github.com/jooja-mind/google-drive
+- Apple Music: https://github.com/jooja-mind/apple-music-jqa
+- Notion: https://github.com/jooja-mind/notion-jqa
+- LinkedIn: https://github.com/jooja-mind/linkedin-jqa
 
 ## 1. What this is
 
