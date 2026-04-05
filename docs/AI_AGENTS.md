@@ -1,6 +1,6 @@
 # Jooja Quick Auth (JQA) — Instructions for AI Agents
 
-This doc is for **other AI agents / internal automation** that need provider access tokens (Google, etc.) without directly handling OAuth refresh tokens.
+This doc is for **other AI agents / internal automation** that need provider access tokens (for example Google or Apple Music) without directly handling OAuth refresh tokens.
 
 JQA is a token vault:
 - humans do the consent flow once
@@ -67,6 +67,16 @@ jqa status
 
 Expected: `hasToken: true`.
 
+For Apple Music, after the human finishes the MusicKit page, also verify token retrieval with:
+
+```bash
+jqa token --provider applemusic --json
+```
+
+That response includes both:
+- `accessToken` - Apple Music Developer Token
+- `musicUserToken` - Apple Music Music User Token
+
 ## 3) Store credentials locally (outside git)
 
 Never commit secrets.
@@ -109,6 +119,8 @@ Full JSON (includes expiry metadata):
 ```bash
 jqa token --json
 ```
+
+For Apple Music, prefer JSON because the response contains two tokens (`accessToken` and `musicUserToken`).
 
 Force refresh:
 

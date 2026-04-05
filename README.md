@@ -7,9 +7,9 @@ Its job is simple:
 - ask for a short-lived access token for some provider
 - give that token to your script, tool, or AI agent
 
-Providers (MVP):
+Providers:
 - `google` (OAuth)
-- `applemusic` (MusicKit JS connect; token response includes an extra `musicUserToken` field)
+- `applemusic` (working MusicKit JS connect flow; token response includes an extra `musicUserToken` field)
 
 Default JQA server:
 - `https://jooja-auth.leverton.dev`
@@ -106,6 +106,8 @@ jqa connect-url
 This uses your configured `JQA_UUID` + `JQA_SECRET` (Basic-authenticated), not a Telegram id or any guessable principal string.
 
 Use this when a human needs to connect a provider account for the first time.
+
+For Apple Music, the printed URL opens a JQA-hosted MusicKit page. The human completes Apple login there, then JQA stores the Music User Token.
 
 ### Check provider status
 
@@ -285,6 +287,12 @@ jqa connect-url
 
 ```bash
 jqa status
+```
+
+For Apple Music, you will usually want to verify token retrieval with:
+
+```bash
+jqa token --provider applemusic --json
 ```
 
 7. Start requesting access tokens with `jqa token` or the package API
