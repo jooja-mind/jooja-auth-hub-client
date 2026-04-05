@@ -9,6 +9,7 @@ It exists mainly so other agents/tools have a single reference implementation fo
 1. **Never commit secrets**
    - Do not commit `.env`.
    - Do not paste real `ADMIN_API_KEY`, OAuth client secrets, bearer tokens, etc. into issues/PRs/logs.
+   - Do not commit real `AUTH_HUB_PRINCIPAL_ID` / `AUTH_HUB_CLIENT_SECRET` pairs in tracked files.
 
 2. **Do not exfiltrate tokens**
    - The hub is a token vault.
@@ -51,5 +52,6 @@ node dist/cli.js health
 - Token retrieval is implemented as an MVP now.
 - It is intentionally **limited** (access tokens only; refresh tokens never leave the hub).
 - Preferred auth is per-principal `clientSecret` (HTTP Basic).
+- Store the credential pair in a local secret file outside git, e.g. `~/.config/jooja-auth-hub-client/env`, unless the target agent already has a canonical secret path.
 - Legacy shared bearer-token mode may still exist for transition.
 - This client must keep the contract honest: do not add features that widen access or dump secrets.

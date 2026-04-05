@@ -66,6 +66,15 @@ cp .env.example .env
 # edit .env
 ```
 
+For real agent deployments, prefer storing these values in a local secret file outside git, for example:
+- `~/.config/jooja-auth-hub-client/env`
+- or another agent-local secret/env path
+
+Recommended minimum secret set:
+- `AUTH_HUB_BASE_URL`
+- `AUTH_HUB_PRINCIPAL_ID`
+- `AUTH_HUB_CLIENT_SECRET`
+
 Key env vars:
 - `AUTH_HUB_BASE_URL` (default: `http://127.0.0.1:8787`)
 - `AUTH_HUB_PRINCIPAL_ID` (UUID)
@@ -142,7 +151,9 @@ curl -s \
 ## Security notes
 
 - Treat `AUTH_HUB_CLIENT_SECRET` like a password.
+- Treat `AUTH_HUB_PRINCIPAL_ID` + `AUTH_HUB_CLIENT_SECRET` together as a credential pair.
 - Do not log authorization headers.
+- Do not store real principal/secret values in git-tracked files.
 - The hub is a token vault. Don’t expose it to the public internet without protections.
 
 See `AGENT.md` for stricter operational rules.
