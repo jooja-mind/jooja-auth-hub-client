@@ -49,27 +49,43 @@ Good CLI use cases:
 
 ### Install / run the CLI
 
-#### With npm install
+This package is currently meant to be consumed **from GitHub**, not from the npm registry.
+
+#### Install from GitHub
 
 ```bash
-npm i jooja-quick-auth
+npm i github:jooja-mind/jooja-auth-hub-client
 ```
 
 Then use the bin:
 
 ```bash
-jqa --help
+npx jqa --help
 ```
 
-#### With npx
+You can also call the alias directly:
 
 ```bash
-npx -p jooja-quick-auth jqa --help
+npx jooja-quick-auth --help
+```
+
+#### One-off use without adding it to package.json
+
+```bash
+npx github:jooja-mind/jooja-auth-hub-client jqa --help
 ```
 
 ---
 
 ## 3. CLI commands
+
+If the package is installed from GitHub in a project, examples below still work the same way:
+
+```bash
+npx jqa health
+npx jqa connect-url
+npx jqa token
+```
 
 ### Health check
 
@@ -149,8 +165,20 @@ This is the better option when:
 
 ### Install
 
+Install directly from GitHub:
+
 ```bash
-npm i jooja-quick-auth
+npm i github:jooja-mind/jooja-auth-hub-client
+```
+
+If you prefer package.json syntax explicitly:
+
+```json
+{
+  "dependencies": {
+    "jooja-quick-auth": "github:jooja-mind/jooja-auth-hub-client"
+  }
+}
 ```
 
 ### Simplest usage
@@ -161,6 +189,8 @@ import { getAccessTokenFromEnv } from 'jooja-quick-auth';
 const token = await getAccessTokenFromEnv();
 console.log(token);
 ```
+
+This is the same import shape even when the package is installed from GitHub.
 
 This reads config from env variables.
 
@@ -213,6 +243,8 @@ export JQA_SECRET="..."
 export JQA_PROVIDER="google"
 ```
 
+Or put them in a local `.env` / secret file outside git and let your project load them.
+
 ### Recommended storage
 
 For real projects and agents, store these in a local secret/env file outside git, for example:
@@ -256,7 +288,29 @@ Then it can ask JQA for short-lived access tokens whenever needed.
 
 ---
 
-## 8. For AI agents
+## 8. Typical project setup from GitHub
+
+A realistic project setup looks like this:
+
+```bash
+npm i github:jooja-mind/jooja-auth-hub-client
+```
+
+```env
+JQA_UUID=...
+JQA_SECRET=...
+JQA_PROVIDER=google
+```
+
+```js
+import { getAccessTokenFromEnv } from 'jooja-quick-auth';
+
+const accessToken = await getAccessTokenFromEnv();
+```
+
+Then use that access token against the provider API you need.
+
+## 9. For AI agents
 
 If this package is being used by another AI agent, read:
 - `docs/AI_AGENTS.md`
@@ -269,7 +323,7 @@ That file explains:
 
 ---
 
-## 9. Security notes
+## 10. Security notes
 
 - Treat `JQA_SECRET` like a password.
 - Treat `JQA_UUID` + `JQA_SECRET` together as a credential pair.
