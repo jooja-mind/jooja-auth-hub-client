@@ -7,9 +7,9 @@ Goal: give other internal scripts/agents a single, boring way to:
 - generate a **human** OAuth connect URL (Google)
 - check whether a principal already has a token stored (status)
 - (admin-only) view token metadata/stats
-- (future) call a strongly-authenticated token retrieval endpoint (placeholder only)
+- request a **short-lived provider access token** from the hub (Google, MVP)
 
-This repo intentionally does **not** include any token retrieval logic for v0, because the hub does not expose it yet.
+Token retrieval is now implemented as an MVP: the hub returns **access tokens only** (no refresh token exfiltration) and requires a shared bearer token.
 
 ## Contract / API surface (v0)
 
@@ -24,6 +24,9 @@ The client assumes the current hub endpoints:
   - `GET /auth/google/callback` (browser redirect target)
 - Google token status:
   - `GET /v1/providers/google/status?principal=<kind:id>` → `{ hasToken, updatedAt, ... }`
+- Token retrieval (bearer-authenticated, returns access token only):
+  - `POST /v1/tokens/access` (preferred)
+  - `GET /v1/tokens/get?principalId=...&providerId=...` (legacy/debug)
 - Admin (optional):
   - `GET /v1/admin/stats` (requires `x-api-key` when the hub has `ADMIN_API_KEY`)
   - `GET /v1/admin/tokens?providerId=...&principalId=...` (never returns token contents)
@@ -55,6 +58,7 @@ Key env vars:
 - `AUTH_HUB_BASE_URL` (default: `http://127.0.0.1:8787`)
 - `AUTH_HUB_PRINCIPAL` (optional default for CLI)
 - `AUTH_HUB_ADMIN_API_KEY` (optional; only for admin endpoints)
+- `AUTH_HUB_BEARER_TOKEN` (required for `/v1/tokens/*` endpoints)
 
 ## CLI usage
 
@@ -70,6 +74,7 @@ Then:
 node dist/cli.js health
 node dist/cli.js google connect-url --principal telegram:540443
 node dist/cli.js google status --principal telegram:540443
+node dist/cli.js token get --principalId telegram:540443 --providerId google
 ```
 
 Admin endpoints:
@@ -107,11 +112,11 @@ curl -s \
 1. Pick a **principal** (currently `kind:id`, e.g. `telegram:540443`).
 2. If status says `hasToken: false`, send the user a connect URL to open in a browser.
 3. After the callback succeeds, poll status again until `hasToken: true`.
-4. (Future) request an access token/refresh token via a proper authenticated endpoint.
+4. Request a short-lived access token via `/v1/tokens/access` (bearer-authenticated).
 
 ## Security notes (read this)
 
-- Treat `AUTH_HUB_ADMIN_API_KEY` as sensitive.
+- Treat `AUTH_HUB_ADMIN_API_KEY` and `AUTH_HUB_BEARER_TOKEN` as sensitive.
 - Do not log URLs that might contain secrets in the future.
 - The hub is a token vault. Don’t expose it to the public internet without protections.
 

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Tiny client + CLI for talking to jooja-auth-hub (health/connect/status; token-get placeholder).",
+  "description": "Tiny client + CLI for talking to jooja-auth-hub (health/connect/status; short-lived token access).",
   "engines": {
     "node": ">=20"
   },

@@ -64,13 +64,13 @@ Usage:
   jooja-auth-hub-client google status --principal <kind:id>
   jooja-auth-hub-client admin stats [--admin-api-key <key>]
   jooja-auth-hub-client admin tokens [--providerId google] [--principalId telegram:...] [--admin-api-key <key>]
-  jooja-auth-hub-client token get --principalId <kind:id> --providerId <provider>
+  jooja-auth-hub-client token get --principalId <kind:id> --providerId <provider> [--min-ttl-sec 120] [--force-refresh]
 
 Env vars:
   AUTH_HUB_BASE_URL         (default http://127.0.0.1:8787)
   AUTH_HUB_ADMIN_API_KEY    (optional; for /v1/admin/*)
   AUTH_HUB_PRINCIPAL        (optional; used when --principal is omitted)
-  AUTH_HUB_BEARER_TOKEN     (placeholder; future token retrieval)
+  AUTH_HUB_BEARER_TOKEN     (required for /v1/tokens/* endpoints)
 
 Examples:
   # Health
@@ -153,10 +153,14 @@ async function main() {
     if (!principalId) throw new Error('Missing --principalId');
     if (!providerId) throw new Error('Missing --providerId');
 
-    const res = await client.tokenGetPlaceholder({ principalId, providerId });
+    const minTtlSecRaw = getFlag(flags, 'min-ttl-sec');
+    const minTtlSec = minTtlSecRaw ? Number(minTtlSecRaw) : undefined;
+    const forceRefresh = hasFlag(flags, 'force-refresh');
+
+    const res = await client.tokenAccess({ principalId, providerId, minTtlSec, forceRefresh });
     if (res === null) {
       // eslint-disable-next-line no-console
-      console.error('Token retrieval endpoint is not implemented in jooja-auth-hub v0 (got 404).');
+      console.error('Token retrieval endpoint is not enabled on the hub (got 404). Is TOKEN_BEARER_TOKEN set on the hub?');
       process.exitCode = 2;
       return;
     }

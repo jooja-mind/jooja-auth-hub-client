@@ -117,12 +117,55 @@ Response:
 ]
 ```
 
-## Token retrieval (NOT in v0)
+## Token retrieval (MVP)
 
-The hub intentionally does **not** expose token contents in v0.
+These endpoints return a **short-lived access token** (never the refresh token).
 
-This client repo includes a placeholder method/CLI command that attempts:
+Auth:
+- hub must be configured with `TOKEN_BEARER_TOKEN`
+- callers must send:
 
+```
+Authorization: Bearer <TOKEN_BEARER_TOKEN>
+```
+
+### `POST /v1/tokens/access`
+
+Request body:
+
+```json
+{
+  "principalId": "telegram:540443",
+  "providerId": "google",
+  "minTtlSec": 120,
+  "forceRefresh": false
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "providerId": "google",
+  "principalId": "telegram:540443",
+  "tokenType": "Bearer",
+  "scope": "...",
+  "accessToken": "ya29...",
+  "issuedAt": "2026-04-05T12:34:56.000Z",
+  "expiresAt": "2026-04-05T13:34:56.000Z",
+  "source": "cache"
+}
+```
+
+Notes:
+- Currently only `providerId=google` is supported.
+- If the stored token has no `refresh_token`, the hub responds with `409 reauth_required`.
+- If `TOKEN_BEARER_TOKEN` is not set on the hub, these routes are **not registered** and you will get `404`.
+
+### Legacy/debug GET aliases
+
+- `GET /v1/tokens/access?principalId=...&providerId=...`
 - `GET /v1/tokens/get?principalId=...&providerId=...`
 
-…but you should expect **404** until the hub grows a real, strongly-authenticated token retrieval story.
+These behave like the POST endpoint but may leak metadata via query-string logging.

@@ -21,8 +21,16 @@ export type AdminTokenListItem = {
   updatedAt: string;
 };
 
-export type TokenGetPlaceholderResponse = {
-  token?: unknown;
+export type TokenAccessResponse = {
+  ok: true;
+  providerId: string;
+  principalId: string;
+  tokenType: string;
+  scope: string | null;
+  accessToken: string;
+  issuedAt: string;
+  expiresAt: string | null;
+  source: 'cache' | 'refresh';
 };
 
 export type AuthHubClientOpts = {
@@ -59,6 +67,7 @@ export class AuthHubClient {
     opts?: {
       query?: Record<string, string | undefined>;
       headers?: Record<string, string | undefined>;
+      body?: unknown;
     }
   ): Promise<{ status: number; json: T } | { status: number; text: string }> {
     const url = this.makeUrl(path, opts?.query);
@@ -70,7 +79,13 @@ export class AuthHubClient {
       ) as Record<string, string>)
     };
 
-    const res = await fetch(url, { method, headers });
+    const init: RequestInit = { method, headers };
+    if (opts && 'body' in opts && opts.body !== undefined) {
+      headers['content-type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+
+    const res = await fetch(url, init);
 
     const contentType = res.headers.get('content-type') ?? '';
     if (contentType.includes('application/json')) {
@@ -160,14 +175,26 @@ export class AuthHubClient {
   }
 
   /**
-   * Placeholder for a future, strongly-authenticated token retrieval endpoint.
+   * Request a short-lived provider access token from the hub.
    *
-   * IMPORTANT: jooja-auth-hub does NOT expose tokens in v0.
+   * Requires hub-side TOKEN_BEARER_TOKEN and client-side AUTH_HUB_BEARER_TOKEN.
    */
-  async tokenGetPlaceholder(opts: { principalId: string; providerId: string }): Promise<TokenGetPlaceholderResponse | null> {
-    const res = await this.fetchJson<TokenGetPlaceholderResponse>('GET', '/v1/tokens/get', {
-      query: { principalId: opts.principalId, providerId: opts.providerId },
-      headers: this.bearerToken ? { authorization: `Bearer ${this.bearerToken}` } : undefined
+  async tokenAccess(opts: {
+    principalId: string;
+    providerId: string;
+    minTtlSec?: number;
+    forceRefresh?: boolean;
+  }): Promise<TokenAccessResponse | null> {
+    if (!this.bearerToken) throw new Error('Missing bearerToken (AUTH_HUB_BEARER_TOKEN)');
+
+    const res = await this.fetchJson<TokenAccessResponse>('POST', '/v1/tokens/access', {
+      headers: { authorization: `Bearer ${this.bearerToken}` },
+      body: {
+        principalId: opts.principalId,
+        providerId: opts.providerId,
+        minTtlSec: opts.minTtlSec,
+        forceRefresh: opts.forceRefresh
+      }
     });
 
     if (res.status === 404) return null;
@@ -175,9 +202,17 @@ export class AuthHubClient {
     if ('json' in res && res.status === 200) return res.json;
 
     if ('json' in res) {
-      throw new Error(`tokenGetPlaceholder failed: HTTP ${res.status} ${JSON.stringify(res.json)}`);
+      throw new Error(`tokenAccess failed: HTTP ${res.status} ${JSON.stringify(res.json)}`);
     }
 
-    throw new Error(`tokenGetPlaceholder failed: HTTP ${res.status} ${res.text}`);
+    throw new Error(`tokenAccess failed: HTTP ${res.status} ${res.text}`);
+  }
+
+  /**
+   * @deprecated Backwards-compat alias for older scripts.
+   * Use tokenAccess() instead.
+   */
+  async tokenGetPlaceholder(opts: { principalId: string; providerId: string }): Promise<TokenAccessResponse | null> {
+    return this.tokenAccess(opts);
   }
 }

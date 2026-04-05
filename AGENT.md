@@ -48,7 +48,6 @@ node dist/cli.js health
 
 ## Notes
 
-- Token retrieval is intentionally only a placeholder right now.
-- When the hub adds a real retrieval endpoint, implement it here **only** if:
-  - the endpoint requires strong auth (client secret / mTLS / short-lived signed requests)
-  - the retrieval flow includes least-privilege + auditability
+- Token retrieval is implemented as an MVP now.
+- It is intentionally **limited** (single shared bearer token, no per-principal ACL yet).
+- This client must keep the contract honest: do not add features that widen access or dump secrets.
