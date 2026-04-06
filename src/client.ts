@@ -169,7 +169,10 @@ export class JqaClient {
   }
 
   /**
-   * Returns the provider OAuth consent URL.
+   * Returns a **JQA-hosted connect page URL**.
+   *
+   * The connect page is a short human-friendly interstitial ("Continue") that then
+   * redirects to the provider OAuth consent URL on the server side.
    *
    * JQA redirects by default, but when `Accept: application/json` is set,
    * it returns `{ url }` instead.

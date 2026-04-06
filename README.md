@@ -120,9 +120,12 @@ This uses your configured `JQA_UUID` + `JQA_SECRET` (Basic-authenticated), not a
 
 Use this when a human needs to connect a provider account for the first time.
 
-For Apple Music, the printed URL opens a JQA-hosted MusicKit page. The human completes Apple login there, then JQA stores the Music User Token.
+The printed URL is a **JQA-hosted connect page**.
 
-For Google and LinkedIn, if you change scopes on the JQA server, generate a new connect URL and reconnect so the updated scope grant is actually issued.
+- For standard OAuth providers (Google, Notion, LinkedIn, GitHub, Microsoft, Discord): the page shows a short explanation + a **Continue** button, then redirects into the provider consent screen.
+- For Apple Music: the URL opens a JQA-hosted **MusicKit JS** page. The human completes Apple login there, then JQA stores the Music User Token.
+
+For providers with scopes (Google, GitHub, LinkedIn, Microsoft, Discord), if you change scopes on the JQA server, generate a new connect URL and reconnect so the updated scope grant is actually issued.
 
 ### Check provider status
 
