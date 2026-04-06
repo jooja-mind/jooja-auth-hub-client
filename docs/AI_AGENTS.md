@@ -1,6 +1,6 @@
 # Jooja Quick Auth (JQA) — Instructions for AI Agents
 
-This doc is for **other AI agents / internal automation** that need provider access tokens (for example Google, Apple Music, Notion, or LinkedIn) without directly handling OAuth refresh tokens.
+This doc is for **other AI agents / internal automation** that need provider access tokens (for example Google, Apple Music, Notion, LinkedIn, GitHub, Microsoft, or Discord) without directly handling OAuth refresh tokens.
 
 JQA is a token vault:
 - humans do the consent flow once
@@ -87,6 +87,10 @@ That response includes both:
 - `musicUserToken` - Apple Music Music User Token
 
 For LinkedIn, OAuth success only means the access token was stored. Posting or other advanced APIs can still require separate LinkedIn product approval.
+
+For GitHub, whether JQA can refresh tokens depends on your GitHub OAuth App configuration (some apps issue non-expiring tokens; others issue expiring tokens with refresh_token).
+
+For Microsoft and Discord, refresh token support typically depends on the `offline_access` scope being granted during connect.
 
 For Google, a server may request sensitive/restricted scopes such as Gmail, Meet, Presentations, or YouTube-related scopes depending on how its connect preset is configured. If that preset changes, reconnect to refresh the granted scope set.
 

@@ -55,6 +55,9 @@ Known provider ids (server-dependent):
 - `applemusic`
 - `notion`
 - `linkedin`
+- `github`
+- `microsoft`
+- `discord`
 
 Notes:
 - Google scope presets are server-defined; a JQA deployment may request broader scopes such as Gmail, Tasks, or Meet.

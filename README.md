@@ -7,11 +7,14 @@ Its job is simple:
 - ask for a short-lived access token for some provider
 - give that token to your script, tool, or AI agent
 
-Providers:
+Providers (server-dependent):
 - `google` (OAuth; JQA full preset currently includes Drive, Sheets, Calendar, Presentations, Gmail, Tasks, Meet space creation, and YouTube read/analytics scopes)
 - `applemusic` (MusicKit JS connect flow; token response includes an extra `musicUserToken` field)
 - `notion` (Notion OAuth; returns a Notion workspace access token)
 - `linkedin` (LinkedIn OAuth; default JQA preset includes posting scope `w_member_social`; note: typically no refresh token)
+- `github` (GitHub OAuth; refresh support depends on whether the OAuth App issues expiring user tokens)
+- `microsoft` (Microsoft OAuth / Microsoft Graph delegated; refresh via offline_access)
+- `discord` (Discord OAuth; refresh via offline_access)
 
 Default JQA server:
 - `https://jooja-auth.leverton.dev`
